@@ -67,7 +67,7 @@ export function SignupPage() {
                 {isVerified ? (
                   <span className={authPageStyles.verifiedTag}>인증됨</span>
                 ) : (
-                  <button className={authPageStyles.inlineButton} type="button" disabled={isSendingCode} onClick={() => void sendCode()}>
+                  <button className={authPageStyles.inlineButton} type="button" disabled={isSendingCode || isVerifyingCode} onClick={() => void sendCode()}>
                     {isSendingCode ? '보내는 중…' : emailStep === 'sent' ? '다시 받기' : '인증번호 받기'}
                   </button>
                 )}
@@ -92,7 +92,7 @@ export function SignupPage() {
                     value={code}
                     onChange={(event) => updateCode(event.target.value)}
                   />
-                  <button className={authPageStyles.inlineButton} type="button" disabled={isVerifyingCode} onClick={() => void verifyCode()}>
+                  <button className={authPageStyles.inlineButton} type="button" disabled={isSendingCode || isVerifyingCode} onClick={() => void verifyCode()}>
                     {isVerifyingCode ? '확인 중…' : '확인'}
                   </button>
                 </div>
@@ -117,7 +117,7 @@ export function SignupPage() {
                 value={password}
                 onChange={(event) => updatePassword(event.target.value)}
               />
-              <span id="signup-password-hint" className="sr-only">8자 이상 72자 이하로 입력합니다.</span>
+              <span id="signup-password-hint" className={authPageStyles.fieldHint}>8~72자, UTF-8 72바이트 이하로 입력합니다. 한글은 보통 한 글자에 3바이트입니다.</span>
             </div>
 
             <label className={authPageStyles.field}>

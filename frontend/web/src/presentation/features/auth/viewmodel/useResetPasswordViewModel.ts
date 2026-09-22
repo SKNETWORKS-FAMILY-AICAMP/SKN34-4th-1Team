@@ -9,7 +9,7 @@ type PasswordResetUseCase = Pick<ResetPasswordUseCase, 'execute'>
 
 export const resetPasswordMessages = {
   missingToken: '재설정 링크가 올바르지 않습니다. 메일의 링크를 그대로 열거나 다시 요청해 주세요.',
-  passwordLength: `비밀번호는 ${signUpPasswordLength.min}자 이상 ${signUpPasswordLength.max}자 이하로 입력해 주세요.`,
+  passwordLength: `비밀번호는 ${signUpPasswordLength.min}자 이상 ${signUpPasswordLength.max}자 이하, UTF-8 ${signUpPasswordLength.maxBytes}바이트 이하로 입력해 주세요.`,
   passwordMismatch: '비밀번호 확인이 일치하지 않습니다.',
   tokenInvalid: '재설정 링크가 만료됐거나 이미 사용됐습니다. 비밀번호 찾기에서 다시 요청해 주세요.',
   done: '비밀번호를 변경했습니다. 새 비밀번호로 다시 로그인해 주세요.',

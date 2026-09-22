@@ -23,7 +23,7 @@ class AccountPasswordResetRepository(
     /** [since] 이후 이 계정이 요청한 횟수입니다. 메일 폭주를 막는 한도 계산에 씁니다. */
     fun countRequestsSince(accountId: Long, since: LocalDateTime): Int = mapper.countResetsSince(accountId, since)
 
-    /** 아직 쓰지 않았고 만료되지 않은 토큰만 돌려줍니다. */
+    /** 호출한 재설정 Service transaction에서 토큰을 잠가 동시 재사용을 막습니다. */
     fun findActiveByTokenHash(tokenHash: String, now: LocalDateTime): PasswordReset? =
         mapper.findActiveResetByTokenHash(tokenHash, now)?.let {
             PasswordReset(id = it.id, accountId = it.accountId, expiresAt = requireNotNull(it.expiresAt) { "expiresAt must not be null" })

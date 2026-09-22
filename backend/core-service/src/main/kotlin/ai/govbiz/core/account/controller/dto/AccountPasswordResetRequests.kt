@@ -1,5 +1,7 @@
 package ai.govbiz.core.account.controller.dto
 
+import ai.govbiz.core.account.controller.validation.PasswordByteLimit
+
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
@@ -20,6 +22,7 @@ class PasswordResetConfirmRequest(
     val token: String,
     @field:NotBlank
     @field:Size(min = 8, max = 72)
+    @field:PasswordByteLimit
     val newPassword: String,
 ) {
     override fun toString(): String = "PasswordResetConfirmRequest()"
