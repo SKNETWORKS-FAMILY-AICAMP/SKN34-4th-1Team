@@ -1,6 +1,6 @@
 package ai.govbiz.core.account.controller.dto
 
-import ai.govbiz.core.account.controller.validation.PasswordByteLimit
+import ai.govbiz.core.account.controller.validation.PasswordCharacters
 
 import ai.govbiz.core.account.service.dto.AccountDeletionPreview
 import jakarta.validation.constraints.NotBlank
@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size
 class ChangePasswordRequest(
     @field:NotBlank
     @field:Size(min = 8, max = 72)
-    @field:PasswordByteLimit
+    @field:PasswordCharacters
     val newPassword: String,
 ) {
     override fun toString(): String = "ChangePasswordRequest"

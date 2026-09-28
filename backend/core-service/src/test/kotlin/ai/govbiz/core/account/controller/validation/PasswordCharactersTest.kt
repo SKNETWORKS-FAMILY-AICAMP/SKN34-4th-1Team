@@ -13,23 +13,29 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 
-class PasswordByteLimitTest {
+class PasswordCharactersTest {
     @Test
-    fun newPasswordRequestsRejectUtf8OverflowAndAcceptTheExactBoundary() {
+    fun newPasswordRequestsAcceptAsciiLettersDigitsAndSymbolsUpToTheBcryptLimit() {
         Validation.buildDefaultValidatorFactory().use { factory ->
             val validator = factory.validator
-            for (password in listOf("a".repeat(72), "한".repeat(24), "😀".repeat(18))) {
+            for (password in listOf("password", "Abc123!@#\$%^&*()_+-=[]{}|;:'\",.<>/?`~", "a".repeat(72))) {
                 newPasswordRequests(password).forEach { assertTrue(validator.validate(it).isEmpty()) }
                 PasswordValidationHelper.requireNewPassword(password)
                 assertTrue(BCryptPasswordEncoder(4).matches(password, BCryptPasswordEncoder(4).encode(password)))
             }
-            for (password in listOf("한".repeat(25), "😀".repeat(19), "a".repeat(70) + "한")) {
+        }
+    }
+
+    @Test
+    fun newPasswordRequestsRejectKoreanEmojiAndSpaces() {
+        Validation.buildDefaultValidatorFactory().use { factory ->
+            val validator = factory.validator
+            for (password in listOf("한".repeat(8), "😀".repeat(8), "pass word1", "a".repeat(7) + "한")) {
                 newPasswordRequests(password).forEach { request ->
-                    assertEquals(setOf(PasswordByteLimit::class.java),
+                    assertEquals(setOf(PasswordCharacters::class.java),
                         validator.validate(request).map { it.constraintDescriptor.annotation.annotationClass.java }.toSet())
                 }
                 assertThrows(IllegalArgumentException::class.java) { PasswordValidationHelper.requireNewPassword(password) }
-                assertThrows(IllegalArgumentException::class.java) { BCryptPasswordEncoder(4).encode(password) }
             }
         }
     }
