@@ -3,8 +3,10 @@
 import argparse
 import json
 import os
+import re
 import secrets
 import subprocess
+import sys
 import tempfile
 import time
 from http.cookiejar import CookieJar
@@ -31,6 +33,55 @@ SCENARIOS = (
     "close_error",
     "duplicate_worker",
 )
+
+
+class PortUnavailable(RuntimeError):
+    def __init__(self, service, port, reason, returncode=None):
+        self.details = {
+            "service": service,
+            "port": port,
+            "reason": reason,
+            "returncode": returncode,
+        }
+        super().__init__(f"Loopback port unavailable: {service}:{port} ({reason})")
+
+
+def verify_network_isolation(config):
+    """Fail before startup if the effective Compose config exposes a workload."""
+    assert config["networks"]["default"]["internal"] is True
+    for name, service in config["services"].items():
+        networks = set(service.get("networks", {"default": None}))
+        if name == "cancellation-ingress":
+            assert networks == {"default", "test-ingress"}
+            assert not service.get("environment"), "Relay must not receive service credentials"
+            ports = service["ports"]
+            assert len(ports) == 3 and {p["target"] for p in ports} == {4200, 8000, 8099}
+            assert all(p["host_ip"] == "127.0.0.1" for p in ports)
+        else:
+            assert networks == {"default"}, f"Workload must remain internal: {name}"
+            assert not service.get("ports"), f"Workload must not publish host ports: {name}"
+
+
+def service_diagnostics(compose):
+    """Keep only state/port metadata; Compose commands and environment contain secrets."""
+    try:
+        raw = compose("ps", "--all", "--format", "json", capture=True).stdout.strip()
+        rows = json.loads(raw) if raw.startswith("[") else [json.loads(v) for v in raw.splitlines()]
+        return [
+            {
+                **{key: row.get(key) for key in ("Service", "State", "Health", "ExitCode")},
+                "Publishers": [
+                    {
+                        key: port.get(key)
+                        for key in ("URL", "TargetPort", "PublishedPort", "Protocol")
+                    }
+                    for port in row.get("Publishers") or []
+                ],
+            }
+            for row in rows
+        ]
+    except Exception as error:
+        return {"unavailable": type(error).__name__}
 
 
 def wait_for(read, accept, *, label, timeout=180):
@@ -97,14 +148,19 @@ class Smoke:
         return result.stdout.strip()
 
     def url(self, service, port):
-        address = self.dc("port", service, str(port)).splitlines()[0]
-        assert address.startswith("127.0.0.1:"), "Test ports must bind loopback only"
+        try:
+            address = self.dc("port", service, str(port))
+        except subprocess.CalledProcessError as error:
+            raise PortUnavailable(service, port, "lookup_failed", error.returncode) from None
+        match = re.fullmatch(r"127\.0\.0\.1:([0-9]+)", address)
+        if not match or not 0 < int(match[1]) < 65536:
+            raise PortUnavailable(service, port, "missing_loopback_binding")
         return "http://" + address
 
     def ready(self):
-        self.probe = self.url("cancellation-probe", 8099)
-        self.ops = self.url("ops-service", 8000)
-        self.prefect = self.url("prefect", 4200) + "/api"
+        self.probe = self.url("cancellation-ingress", 8099)
+        self.ops = self.url("cancellation-ingress", 8000)
+        self.prefect = self.url("cancellation-ingress", 4200) + "/api"
 
         def langfuse():
             try:
@@ -117,7 +173,7 @@ class Smoke:
         def session():
             try:
                 return self.api("/api/v1/ops/session")
-            except (URLError, OSError):
+            except (URLError, OSError, ValueError):
                 return 0, {}
 
         _, body = wait_for(session, lambda r: r[0] == 200, label="Ops readiness")
@@ -130,7 +186,7 @@ class Smoke:
                 return request(
                     self.prefect + "/deployments/name/govbiz-ops-evidence-evaluation/saved-capture"
                 )
-            except (URLError, OSError):
+            except (URLError, OSError, ValueError):
                 return 0, {}
 
         wait_for(
@@ -279,6 +335,7 @@ class Smoke:
                 "passed": True,
             }
         )
+        print(f"Passed cancellation scenario: {self.active['scenario']}", flush=True)
         self.active = None
 
     def run(self):
@@ -428,6 +485,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "work/llmops-ci/cancellation.json")
     args = parser.parse_args()
+    if sys.version_info[:2] != (3, 12):
+        parser.error("Python 3.12 is required; use backend/ai-service/.venv/bin/python")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     project = "govbiz-cancel-test-" + uuid4().hex[:12]
     values = isolated_environment()
@@ -436,6 +495,8 @@ def main():
     environment.update(values)
     smoke = None
     failure = None
+    failure_details = None
+    phase = "config"
     with tempfile.TemporaryDirectory(prefix="cancellation-", dir=args.output.parent) as temporary:
         env_file = Path(temporary) / "isolated.env"
         env_file.write_text("".join(f"{k}={v}\n" for k, v in values.items()), encoding="utf-8")
@@ -464,7 +525,10 @@ def main():
             )
 
         try:
-            compose("config", "--quiet")
+            verify_network_isolation(
+                json.loads(compose("config", "--format", "json", capture=True).stdout)
+            )
+            phase = "start"
             # No ops-sync: race tests explicitly control the timing of the real detail/cancel API.
             compose(
                 "up",
@@ -475,8 +539,10 @@ def main():
                 "prefect",
                 "ops-service",
                 "cancellation-probe",
+                "cancellation-ingress",
                 "evaluation-runner",
             )
+            phase = "migrate"
             compose(
                 "exec",
                 "-T",
@@ -486,6 +552,7 @@ def main():
                 "migrate",
                 "--noinput",
             )
+            phase = "budget"
             compose(
                 "exec",
                 "-T",
@@ -499,10 +566,15 @@ def main():
                 "400000",
             )
             smoke = Smoke(compose)
+            phase = "ready"
             smoke.ready()
+            phase = "scenarios"
             smoke.run()
         except Exception as error:
             failure = type(error).__name__  # HTTP bodies and credentials must not enter artifacts.
+            failure_details = {"phase": phase}
+            if isinstance(error, PortUnavailable):
+                failure_details.update(error.details)
             raise
         finally:
             report = {
@@ -514,6 +586,9 @@ def main():
                 "failure": failure,
                 "scenarios": smoke.records if smoke else [],
             }
+            if failure:
+                report["failure_details"] = failure_details
+                report["services"] = service_diagnostics(compose)
             if smoke and smoke.active:
                 unfinished = {k: v for k, v in smoke.active.items() if k != "payload"}
                 for name, read in (

@@ -4,14 +4,14 @@ services:
   langfuse-web:
     ports: !reset []
   prefect:
-    ports: !override ["127.0.0.1::4200"]
+    ports: !reset []
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4200/api/health', timeout=2)"]
       interval: 2s
       timeout: 3s
       retries: 90
   ops-service:
-    ports: !override ["127.0.0.1::8000"]
+    ports: !reset []
     extra_hosts: !reset []
     environment:
       CORE_API_URL: http://cancellation-probe:8099
@@ -39,7 +39,6 @@ services:
     build: ../../backend/ops-service
     init: true
     command: ["python", "/test/cancellation_probe.py"]
-    ports: ["127.0.0.1::8099"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8099/health', timeout=2)"]
       interval: 2s
@@ -48,7 +47,21 @@ services:
     volumes:
       - ./cancellation_probe.py:/test/cancellation_probe.py:ro
 
-# 모델 대역의 전송 경로 검증과 별개로 모든 테스트 컨테이너의 외부 egress를 차단한다.
+  # Docker does not publish host ports on an internal-only network. Only this
+  # fixed-destination HTTP relay joins the ingress network; workloads stay offline.
+  cancellation-ingress:
+    build: ../../backend/ops-service
+    init: true
+    command: ["python", "/test/cancellation_ingress.py"]
+    ports: ["127.0.0.1::8099", "127.0.0.1::8000", "127.0.0.1::4200"]
+    networks: [default, test-ingress]
+    depends_on:
+      cancellation-probe: {condition: service_healthy}
+    volumes:
+      - ./cancellation_ingress.py:/test/cancellation_ingress.py:ro
+
+# 모델 대역과 별개로 실제 서비스의 외부 egress를 차단한다. ingress만 호스트 접속을 중계한다.
 networks:
   default:
     internal: true
+  test-ingress: {}

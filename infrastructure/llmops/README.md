@@ -862,8 +862,24 @@ production 코드·호출 재시도·실행 명세는 바꾸지 않는다. 읽�
 [cancellation_runner.py](cancellation_runner.py)가 실제 `ops_flow.evaluate_saved_capture.fn`을
 Prefect flow 안에서 호출하고, 명세 검증과 예산 승인을 통과한 모델 요청만 대역으로 전달한다.
 [cancellation_probe.py](cancellation_probe.py)는 실제 Ops/Prefect HTTP 처리 전 실패 또는 처리 후
-응답 유실을 주입한다. 기존 개발용 `.env`는 읽지 않고 비밀값을 매번 생성하며, 모든 테스트 서비스는
-Docker `internal: true` 네트워크만 사용한다. 모델 대역도 지정 URL 이외의 전송을 거절한다.
+응답 유실을 주입한다. 기존 개발용 `.env`는 읽지 않고 비밀값을 매번 생성한다. 실제 서비스와 모델
+대역은 Docker `internal: true` 네트워크만 사용하며, 모델 대역도 지정 URL 이외의 전송을 거절한다.
+
+호스트 접속은 테스트 전용 [cancellation_ingress.py](cancellation_ingress.py)가 중계한다.
+이 컨테이너만 별도 ingress 네트워크에 연결하며 임시 포트는 `127.0.0.1`에만 바인딩한다.
+목적지는 Ops·Prefect·probe 세 서비스로 고정하고, 인증 쿠키·CSRF 헤더·HTTP 상태를 그대로 전달한다.
+외부 URL·CONNECT·redirect 추적은 지원하지 않으며 서비스 비밀값을 주입하지 않는다.
+실행 전에는 최종 Compose 설정에서 서비스의 외부 네트워크 연결·호스트 포트 공개와
+중계기의 비밀값 주입을 검사한다.
+
+이 경로는 기존 CI의 `docker compose port cancellation-probe 8099` 실패를 수정한 것이다.
+Docker Engine 29.6.2 / Compose 5.3.1의 Linux 컨테이너로 재현했을 때 probe는 healthy였지만
+internal 전용 네트워크의 실제 포트 바인딩은 비어 있었고 `compose port`는 `invalid IP:0`을 반환했다.
+CI에서는 같은 준비 단계가 exit 1로 끝났다. 전체 네트워크의 격리를 해제하는 대신 접속 중계기만
+추가했으며, production Compose와 평가·취소 업무 코드는 변경하지 않았다.
+재기동 직후의 연결 실패·HTML 오류 응답은 준비 상태 GET 조회에서만 재확인한다. 제한 시간까지
+정상 JSON 응답이 없으면 실패하며 접수·취소·모델 요청을 이 규칙으로 재전송하지 않는다.
+호스트 실행도 Python 3.12로 고정하고 다른 버전이면 컨테이너를 만들기 전에 오류를 반환한다.
 
 | 시나리오 | 확인 내용 |
 |---|---|
@@ -882,20 +898,50 @@ PID 재사용을 구분한다. 취소 상태를 강제로 CANCELLED로 덮어쓰
 close HTTP 실패 후 예약을 유지하는 현재 동작을 검증하며, 미확인 예약 복구 기능을 추가하지 않는다.
 
 ```bash
-# 저장소 루트: Linux 컨테이너가 가능한 Docker Engine + Compose 필요
-python infrastructure/llmops/cancellation_smoke.py --output work/llmops-ci/cancellation.json
+# 저장소 루트: Python 3.12, Linux 컨테이너가 가능한 Docker Engine + Compose 필요
+backend/ai-service/.venv/bin/python infrastructure/llmops/cancellation_smoke.py --output work/llmops-ci/cancellation.json
 
 # backend/ai-service: 서버/유료 API 없이 도구 계약과 SDK→HTTP 대역 확인
 uv run --locked --extra dev --group evaluation python -m pytest ../../infrastructure/llmops/test_cancellation_smoke.py ../../infrastructure/llmops/test_ops_smoke.py -q
 ```
 
-실행 흐름은 `테스트 클라이언트 → Ops → MySQL 예약·Prefect 접수 → 실제 평가 실행기 →
+실행 흐름은 `테스트 클라이언트 → 테스트 접속 중계기 → Ops → MySQL 예약·Prefect 접수 → 실제 평가 실행기 →
 Ops 승인 → HTTP 모델 대역 → Ops 정산`이다. 완료 시 실제 보고서 생성과 Langfuse 저장도 거친다.
 도구가 만든 프로젝트와 볼륨만 마지막에 정리하며 기존 개발 프로젝트는 변경하지 않는다.
 
 [LLMOps CI](../../.github/workflows/llmops-ci.yml)의 기존 필수 job 안에서 11개 시나리오를 실행한다.
 JSON에는 실행/flow ID, 단계 상태, 승인·전송·정산 횟수, 예산 전후 값, 프로세스 종료 증거를 남긴다.
-실패하면 진행 중이던 실행의 관찰 기록도 보관한다. 인증값과 질문·답변 원문은 이 파일에 저장하지 않는다.
+실패하면 진행 중이던 실행의 관찰 기록도 보관한다. 준비 단계 실패도 단계명, 포트 조회 대상·오류 종류·
+종료 코드, 서비스 상태·건강 상태·실제 포트 매핑을 정리 전에 보존한다. 비밀값이 섞일 수 있는
+원본 stderr·명령·환경변수·서비스 로그와 인증값·질문·답변 원문은 이 파일에 저장하지 않는다.
 CI는 파일을 7일간 artifact로 보존하며, 이 단계가 실패하면 기존 이미지 발행·승격 gate도 통과하지 못한다.
+로컬 전체 실행에서 초기화와 11개 시나리오가 기존 15분 한도를 넘겨 CI 단계 한도를 20분으로 조정했다.
+각 준비 검사·barrier·종료 대기의 제한 시간과 시간 초과 실패 판정은 유지한다.
 로컬 Docker 엔진이 실행되지 않은 환경에서는 무료 테스트와 Compose 렌더링만 확인할 수 있다.
 최신 SHA의 실제 CI가 통과하기 전에는 통합 검증 완료로 판단하지 않는다.
+
+#### 2026-09-29 로컬 수정·검증 결과
+
+`skn-46`의 작업 트리에서 Python 3.12.14, Docker Engine 29.6.2 / Compose 5.3.1로 확인했다.
+
+```bash
+# 저장소 루트, 기존 Python 3.12 평가 가상환경 사용
+backend/ai-service/.venv/bin/python -m pytest infrastructure/llmops/test_cancellation_smoke.py -q
+backend/ai-service/.venv/bin/python infrastructure/llmops/cancellation_smoke.py --output work/llmops-ci/cancellation-current.json
+```
+
+- 무료 계약·회귀 테스트 **36개 통과**. 포트 조회 실패·격리 해제·중계기 인증 전달·잘못된 Python
+  버전·재기동 중 비JSON 응답과 영구 장애의 시간 초과를 포함한다.
+- 실제 서버의 **11개 시나리오 전체 통과**, 준비·정리 포함 **15분 46초**.
+  JSON의 시나리오 순서·중복 없음·실제 프로세스 종료·정리 실패 없음까지 대조했다.
+- 실제 예산 승인 23건, HTTP 모델 대역 전송 22건, 사용량 정산 19건을 확인했다.
+  승인 응답 유실의 전송 0건과 미확인 사용량 보존을 포함한다. 외부 OpenAI 호출은 0건이다.
+- Ruff 검사·포맷, 최종 Compose의 네트워크·포트 정책, CI YAML·실행 경로, `git diff --check` 통과.
+  재현·재검증에 만든 임시 프로젝트 4개의 컨테이너·볼륨·네트워크는 모두 정리했다.
+
+전체 결과는 git 제외 파일 `work/llmops-ci/cancellation-current.json`에 있다.
+첫 실행의 Python 버전 오류와 이후 재기동 준비 검사 오류는 각각 `cancellation-local.json`,
+`cancellation-python312.json`으로 별도 보존했다. 기존 개발 DB·볼륨은 변경하지 않았다.
+이 변경은 `skn-48` 브랜치로 관리한다. 위 결과는 커밋 전 로컬 검증 기록이며 수정 SHA의 필수 CI는
+별도로 확인해야 한다. 로컬의 11개 시나리오
+통과는 현재 모델의 품질 기준 확보나 종료 실패 예약의 자동 정리 기능 구현을 의미하지 않는다.
