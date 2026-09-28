@@ -24,8 +24,8 @@ LLMOps CI·예산·취소·근거 답변 추적 코드의 차이는 없다. 다�
 |---|---|---|
 | 접수·검토·품질 판정 | [실행 명세](../backend/ops-service/apps/evaluations/execution_spec.py), [품질 판정](../backend/ops-service/apps/evaluations/quality.py), [정책](../backend/ops-service/apps/evaluations/quality_policy.py) | 버전 고정·자료/사례 검토·판정·기준 지정은 구현됐다. 현재 모델의 사람 검토 기준 확보는 별도 운영 증거가 필요하다. 이번 검토에서 운영 DB의 검토 여부는 확인하지 않았다. |
 | 누적 호출·출력 예산 | [budget.py](../backend/ops-service/apps/evaluations/budget.py), [모델](../backend/ops-service/apps/evaluations/models.py) | DB 전역 예약·단일 소유권·정산·초과 차단은 구현됐다. 입력 토큰/금액/기간 한도는 없다. |
-| 평가 취소 | [services.py](../backend/ops-service/apps/evaluations/services.py), [취소 테스트](../backend/ops-service/apps/evaluations/test_cancellation.py) | 요청자 권한·취소 기록·신규 승인 차단·종료 확인·환급 경합은 구현됐다. 실제 실행기 중단 통합 시나리오는 추가해야 한다. |
-| 실서버 CI | [LLMOps CI](../.github/workflows/llmops-ci.yml), [Ops smoke](../infrastructure/llmops/ops_smoke.py) | 저장 응답·인증·재접수·보고서·무료 복구·실행 명세 불일치를 검증한다. 실제 예산 API와 취소를 통과하는 실행기 수명주기 검증은 없다. |
+| 평가 취소 | [services.py](../backend/ops-service/apps/evaluations/services.py), [취소 테스트](../backend/ops-service/apps/evaluations/test_cancellation.py) | 요청자 권한·취소 기록·신규 승인 차단·종료 확인·환급 경합은 구현됐다. 실제 실행기 중단 11개 시나리오를 추가했으며, 아래 PR A의 최신 검증 상태를 따른다. |
+| 실서버 CI | [LLMOps CI](../.github/workflows/llmops-ci.yml), [Ops smoke](../infrastructure/llmops/ops_smoke.py) | 저장 응답·인증·재접수·보고서·무료 복구·실행 명세 불일치를 검증한다. 실제 예산 API·취소·실행기 수명주기 검증도 추가했다. CI 실패와 후속 수정 상태는 아래 PR A에서 구분한다. |
 | 한도 변경·장부 조회 | [한도 명령](../backend/ops-service/apps/evaluations/management/commands/set_evaluation_budget.py), [공개 API](../backend/ops-service/apps/evaluations/urls.py), [웹 계약](../frontend/web/src/data/ops/opsApi.ts) | 한도 변경은 CLI이며 변경자·사유·이전/새 값의 별도 감사 이력이 없다. 예산 잔여·예약·미확인 내역을 보는 관리자 API·화면도 없다. |
 | 미확인 예약 복구 | [worker_action/close_after_cancellation](../backend/ops-service/apps/evaluations/budget.py), [ops_flow.py](../evaluation/support-program-evidence/ops_flow.py) | claim은 실행 try/finally 앞에 있고 close 실패를 자동 재정산하지 않는다. 취소 기록 없는 FAILED/CRASHED 등은 동기화에서 예약을 정리하지 않으며 종료된 실행에는 새 취소도 거절한다. closed 예약의 늦은 settle도 거절한다. 보수적으로 한도를 유지하지만 이를 안전하게 정리하는 별도 경로가 필요하다. |
 | 추적·평가 범위 | [tracing.py](../backend/ai-service/app/support_program_evidence/tracing.py), [evaluate.py](../evaluation/support-program-evidence/evaluate.py) | trace 허용 범위는 answer/model 두 span이다. 고정 근거 평가 자료는 synthetic·ai-authored, 최대 3문서·12사례다. 자동 의미 충실도는 미측정이다. |
@@ -102,7 +102,11 @@ Prefect 서버·실행기로 바꾼 별도 CI 시나리오를 추가한다. 모�
 [테스트 실행 안내](../infrastructure/llmops/README.md#실제-취소예산-통합-검증)를 추가했다.
 위 행렬을 승인 응답 유실·첫 승인 전 취소까지 포함한 11개 시나리오로 구성하고 기존 필수 LLMOps CI
 job에 연결했다. 모델 응답과 Core 인증 fixture를 제외한 Ops·MySQL·Prefect·평가·Langfuse 경로를
-실제로 실행한다. 현재 로컬 Docker 엔진이 꺼져 있어 실제 컨테이너 시나리오는 검증 대기다.
+실제로 실행한다. 병합 `baae7bd`의 CI는 시나리오 시작 전 호스트 포트 조회에서 실패했다.
+후속 수정에서 내부 네트워크의 포트 게시 누락을 Docker 29.6.2로 재현하고, 공개 포트 없이 내부
+HTTP를 호출하도록 바꿨다. 무료 관련 테스트 43개·Compose 격리 검사·Ruff는 통과했다.
+Windows 호스트 + Docker Desktop Linux Engine 29.6.2에서 실제 11개 시나리오도 모두 통과했고
+테스트 자원 정리를 확인했다. 최신 수정 SHA의 원격 필수 CI는 아직 검증 대기다.
 무료 계약 테스트/설정 렌더링을 실제 통합 통과로 간주하거나 PR B 진입 근거로 사용하지 않는다.
 
 ### PR B — 예산을 설명할 수 있는 운영 API·화면
