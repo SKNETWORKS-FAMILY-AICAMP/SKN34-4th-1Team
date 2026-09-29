@@ -1,15 +1,19 @@
 # GovBiz Kubernetes · GitOps
 
+> **현재 방침:** `deploy/fork` 배포 브랜치 방식은 사용하지 않습니다.
+> 아래 배포 후보·PR 승인·해당 브랜치로의 Argo 전환 설명은 기존 구현 기록이며 현재 진행 절차가 아닙니다.
+> 현재 개발 순서는 [LLMOps 후속 전략](../../docs/llmops-next-development-plan.md)을 따릅니다.
+
 기존 `GovBiz-infra`의 배포 설정·검증 도구를 **통합 저장소의 `infrastructure/gitops/`**로 옮겼습니다.
 별도 Git 저장소나 submodule이 아닙니다. 애플리케이션과 배포 설정을 같은
-`SKNETWORKS-FAMILY-AICAMP/SKN34-4th-1Team`의 소스에서 관리하며, 개인 포크의 승인된 서비스 배포 입력은 `deploy/fork`에 둡니다.
+`SKNETWORKS-FAMILY-AICAMP/SKN34-4th-1Team`의 소스에서 관리합니다.
 
 앱 코드·Dockerfile·로컬 Compose는 [통합 저장소 루트](../../README.md)에 있으며,
 이 디렉터리는 Kubernetes의 원하는 상태와 격리된 로컬 검증을 담당합니다.
 기존 개인 Mac 클러스터와 새 포크의 개발 클러스터는 분리합니다. 공통 실행 도구는 로컬 `origin`에서
 계정·저장소를 읽고, CI는 GitHub가 제공한 저장소 정보를 사용하므로 팀원이 계정명을 소스에서 바꾸지 않습니다.
 
-[2026-09-29 GitOps 검수·후속 전략](../../docs/gitops-strategy-review-20260929.md)에 현재 코드와 원격 CI·보호 규칙을 대조한 결과, 배포 설정의 승격 경계와 Ops 실행 계약의 보완 순서를 정리했습니다. [전체 배포 후보와 PR 승인](docs/deployment-candidates.md)을 구현했으며 원격 보호 설정·실제 전환은 별도입니다.
+[2026-09-29 GitOps 검수 기록](../../docs/gitops-strategy-review-20260929.md)에 당시 코드와 원격 CI·보호 규칙을 대조한 결과를 보존했습니다. [전체 배포 후보와 PR 승인](docs/deployment-candidates.md)은 기존 구현이지만 현재 사용하지 않습니다.
 
 ## 현재 상태
 
@@ -17,10 +21,10 @@
 | --- | --- |
 | 서비스 | 서비스별 Helm Deployment·Service, Ops 전용 PreSync migration Job |
 | 데이터 | Core·Catalog·Ops 전용 MySQL, 로컬 검증용 Redis·Elasticsearch·Qdrant |
-| Argo CD | 포크의 승인된 `deploy/fork` snapshot에 있는 Application 4개를 적용. 전용 클러스터만 허용 |
+| Argo CD | 기존 `deploy/fork` snapshot 경로 구현 보존. 현재 해당 방식은 미사용 |
 | 로컬 이미지 검증 | 로컬 빌드·kind 적재 smoke 유지. GHCR 계정 불필요 |
 | 개인 GHCR | 개인 포크가 자기 `ghcr.io/<계정>/<저장소>-<서비스>`에만 비공개 발행. 최초 계정별 인증/활성화 필요 |
-| 자동 발행·승격 | upstream 병합 소스를 본인 포크 기본 브랜치로 동기화하고 다섯 CI 통과 후 발행. 전체 후보 검사·PR 리뷰·수동 병합 후 `deploy/fork` 갱신 |
+| 자동 발행·승격 | upstream 병합 소스 동기화·필수 CI 후 이미지 발행. `deploy/fork` 배포 후보 승격은 현재 미사용 |
 | 공통 bootstrap | `fork_cluster.py init/doctor/up/status/credentials/dev/gitops/web`. 무작위 로컬 비밀값·전용 kind·소유권 검사 |
 | 로컬 코드 반영 | 개발 모드에서 `dev.py --watch`가 변경 서비스만 로컬 빌드·kind 적재·재시작. GHCR 업로드 없음 |
 | Windows 개발 | WSL2·kind의 로컬 소스 이미지 기동과 Windows 웹 연결 확인. 네이티브 Windows Python·ARM은 미지원이며 GHCR·GitOps·개발 감시는 별도 검증 |
@@ -34,7 +38,7 @@ self-heal을 켭니다(prune는 끔). 기존 `govbiz-portfolio`를 변경하거�
 
 **이미지가 없거나 GHCR 없이 시작하려면 [Windows 수동 설치 안내](../../docs/windows-kubernetes-setup.md)를 따릅니다.**
 소스 빌드 → `up --local-images` → 웹 연결 순서이며, 이 경로는 개인 Actions나 PAT가 필요하지 않습니다.
-아래는 GHCR 이미지 발행·다운로드와 GitOps를 사용할 때의 준비 순서입니다.
+아래 GHCR·배포 후보·GitOps 전환 절차는 기존 `deploy/fork` 방식의 기록이며 현재 진행 대상에서 제외합니다.
 
 [공통 로컬 개발 안내](../../docs/local-fork-development.md)에 따라 **개인 포크 → 클론 → 도구 설치 → 개인 Actions 활성화 →
 upstream 병합 코드의 원격 포크 동기화 → 이미지 발행 → 배포 브랜치·보호 규칙 준비 → 후보 PR 검사·승인·수동 병합 → `git pull` → 초기화**를 진행합니다.
