@@ -300,11 +300,23 @@ Core는 다음 불변식을 다시 검사합니다.
           "explanation": "본문이 서울 소재 기업을 지원대상으로 명시합니다.",
           "evidence": [{ "field": "TARGET_DESCRIPTION", "quote": "서울 소재 창업기업" }]
         }
+      },
+      "analysisSummary": {
+        "summaryLine": "서울 AI 창업기업에 최대 5천만원의 사업화 자금을 지원합니다.",
+        "supportAmountText": "최대 5천만원",
+        "maxAmountKrw": 50000000,
+        "supportTypes": ["GRANT"]
       }
     }
   ]
 }
 ```
+
+`analysisSummary`는 카드 한 줄 정보용 AI 공고 분석 요약이며 nullable입니다. 현재 공고 내용과 지문이 같은
+`COMPLETED` 분석이 있을 때만 채우고 없으면 `null`입니다. 검색(GET·POST), 로그인 후 복원, 직접 필터 목록
+(`/catalog`)이 같은 필드를 가지며 관심 공고함 응답에서는 항상 `null`입니다. 응답에 싣는 공고만 한 번의 DB 조회로
+읽고(비회원 미리보기는 공개 2건만), 복원 시에는 Redis 스냅샷이 아니라 현재 분석을 다시 읽습니다. 근거·조건은
+상세 `analysis`에만 있습니다. 필드 규칙은 [공고 분석](support-program-analysis.md#목록검색-카드-요약)에 있습니다.
 
 기존 GET의 빈 검색어 조회는 AI Service를 호출하지 않으므로 `matchedReasons`는 빈 배열이고 `recommendationScore`는
 `null`이며 `eligibilityReview`도 `null`입니다. 상세 GET도 사용자별 판정을 다시 실행하지 않으므로
@@ -335,7 +347,8 @@ Frontend의 원문 URL 검증은 `BIZINFO`에 `bizinfo.go.kr`, `KSTARTUP`에 `k-
 `status=OPEN`이 기본이며 MSIT·CNTRADE_NOTICE처럼 접수 기간이 없는 공고는 `status=UNKNOWN` 또는 `ALL`로
 검색합니다. 출처 선택만으로 사용자의 접수 상태 필터를 자동으로 바꾸지 않습니다.
 두 새 출처는 게시일을 접수 시작일로 쓰지 않고, API에 없는 지역·분야는 빈 배열을 유지합니다.
-목록은 공개된 MySQL 스냅샷을 읽으며 제공처 API나 LLM을 요청마다 호출하지 않습니다.
+목록은 공개된 MySQL 스냅샷을 읽으며 제공처 API나 LLM을 요청마다 호출하지 않습니다. 각 공고의 `analysisSummary`는
+백그라운드에서 미리 저장한 현재 완료 분석이 있을 때만 채우며, 페이지를 자른 뒤 그 페이지 공고만 한 번에 읽습니다.
 
 ## 공개 상세 조회
 
@@ -357,8 +370,11 @@ Accept: application/json
 `title`, `organization`, `summary`, `categories`, `regions`, `targetDescription`, `applicationPeriod`,
 `applicationStartDate`, `applicationEndDate`, `status`, `sourceName`, `sourceUrl`)에 `evidenceQuestionSupported`를
 더한 형태입니다. 상세 조회에는 검색 질의가 없으므로 검색 전용 `matchedReasons`·`recommendationScore`·`eligibilityReview`는
-포함하지 않습니다. `evidenceQuestionSupported`는 공식 원문 근거 질문을 지원하는 제공처(현재 `BIZINFO`)인지 서버가 정한 값이며,
-화면은 제공처 코드를 직접 비교하지 않고 이 값으로 질문 입력을 보여 줍니다. `is_source_present = FALSE`인
+포함하지 않으며, 카드용 `analysisSummary` 대신 전체 `analysis`를 제공합니다. `evidenceQuestionSupported`는 공식 원문 근거 질문을 지원하는 제공처(현재 `BIZINFO`)인지 서버가 정한 값이며,
+화면은 제공처 코드를 직접 비교하지 않고 이 값으로 질문 입력을 보여 줍니다. `analysis`는 항상 포함되는 AI 공고 분석
+(`status`: `COMPLETED`·`FAILED`·`NOT_ANALYZED`)이며, 현재 공고 내용과 지문이 같은 결과만 `COMPLETED`·`FAILED`로
+보입니다. 필드·열거값은 [공고 분석](support-program-analysis.md#상세-응답)에 있습니다. 상세 GET은 분석을 새로 실행하지 않습니다.
+`is_source_present = FALSE`인
 과거 공고와 존재하지 않는 복합 식별자는 모두 다음의 안정적인 404 오류로 처리합니다.
 
 ```json
@@ -371,6 +387,46 @@ Accept: application/json
   "code": "SUPPORT_PROGRAM_NOT_FOUND"
 }
 ```
+
+## 내 기업 조건 확인
+
+로그인한 회원의 기업 프로필(소재지·설립연도)로 상세 `analysis.conditions`를 하나씩 확인합니다. 저장된 분석만 읽고
+AI를 호출하지 않으며 결과를 저장하지 않습니다.
+
+```http
+GET /api/v1/me/support-programs/condition-check?sourceCode=BIZINFO&sourceProgramId=PBLN_001
+Accept: application/json
+Cookie: govbiz_session=...
+```
+
+식별 파라미터 규칙과 없는·미노출 공고의 404 `SUPPORT_PROGRAM_NOT_FOUND`는 공개 상세 조회와 같습니다. 세션이 없거나
+만료되면 401 `AUTHENTICATION_REQUIRED`이며, 응답은 `Cache-Control: no-store`입니다.
+
+```json
+{
+  "status": "CHECKED",
+  "analyzedAt": "2026-10-01T10:00:00",
+  "referenceDate": "2026-10-01",
+  "profile": { "region": "서울", "foundedYear": 2019 },
+  "overall": "UNKNOWN",
+  "conditions": [
+    { "index": 0, "result": "MET", "reason": "REGION_MATCH" },
+    { "index": 1, "result": "UNKNOWN", "reason": "BOUNDARY_YEAR" }
+  ]
+}
+```
+
+- `status`: `CHECKED` | `NO_COMPANY`(기업 미등록, `profile: null`) | `NOT_ANALYZED`(현재 완료 분석 없음, 기업 유무보다 우선).
+  `CHECKED`가 아니면 `overall: null`, `conditions: []`입니다.
+- `analyzedAt`: 확인에 쓴 분석 시각(상세 `analysis.analyzedAt`과 같은 형식), `NOT_ANALYZED`면 `null`. `referenceDate`: 서울 기준 오늘.
+- `profile.region`: 프로필 소재지(예: `서울특별시`)를 17개 시·도 약칭으로 바꾼 값, 알 수 없으면 `null`.
+- `conditions[].index`: 같은 분석의 상세 `analysis.conditions` 위치(같은 순서). `result`: `MET` | `NOT_MET` | `UNKNOWN`.
+- `conditions[].reason`: `REGION_MATCH` | `REGION_MISMATCH` | `BUSINESS_AGE_WITHIN` | `BUSINESS_AGE_OUTSIDE` |
+  `BOUNDARY_YEAR` | `PRE_STARTUP_ONLY` | `PROFILE_MISSING` | `NOT_COMPARABLE`.
+- `overall`: 필수·제외 조건만 반영하며 우대 조건은 영향을 주지 않습니다.
+
+판정 규칙(지역 정규화, 설립연도 경계, 제외·우대 매핑, 전체 판정)은
+[공고 분석](support-program-analysis.md#내-기업-조건-확인)에 있습니다. 이 결과는 신청 자격이나 선정을 확정하지 않습니다.
 
 ## 공개 공식 원문 근거 질문
 

@@ -489,12 +489,29 @@ AI·임베딩·Qdrant·외부 제공처 API를 호출하지 않으며 색인 장
 ```text
 GET /api/v1/support-programs/detail
   → SupportProgramController → SupportProgramDetailService
-  → SupportProgramRepository → MyBatis Mapper → Mapper XML → MySQL
+  → SupportProgramRepository·SupportProgramAnalysisRepository → MyBatis Mapper → Mapper XML → MySQL
 ```
 
-상세 GET은 외부 API·AI를 호출하지 않습니다. 현재 노출된 복합 식별자 행만 반환하며 없는·미노출 행은
+상세 GET은 외부 API·AI를 호출하지 않습니다. 응답의 `analysis`는 백그라운드 Worker가 미리 저장한 공고 분석을
+복합 식별자로 한 번 더 읽은 값이며, 현재 공고 내용 지문과 다르면 `NOT_ANALYZED`입니다
+([공고 분석](support-program-analysis.md)). 현재 노출된 복합 식별자 행만 반환하며 없는·미노출 행은
 `SUPPORT_PROGRAM_NOT_FOUND`(404)입니다. 검색 문맥이 없으므로 추천 이유는 빈 배열, 점수는 `null`입니다.
 공개 입력 제한과 JSON·오류 코드의 전체 계약은 [지원사업 API 계약](support-program-search-contract.md)에 있습니다.
+
+검색·복원·직접 필터 목록의 카드용 `analysisSummary`는 응답에 싣는 공고가 정해진 뒤 각 Service
+(`SupportProgramSearchPreviewService`·`SupportProgramCatalogService`)가 `SupportProgramAnalysisRepository.findCurrentSummaries`로
+복합 식별자 IN 조회 한 번에 읽습니다. 순위 계산·AI 호출 안에서는 읽지 않고, 검색 결과 Redis 스냅샷에도 저장하지 않아
+복원 때 현재 분석을 다시 읽습니다.
+
+```text
+GET /api/v1/me/support-programs/condition-check
+  → SupportProgramConditionCheckController → SupportProgramConditionCheckService
+  → SupportProgramRepository·SupportProgramAnalysisRepository·CompanyRepository → MyBatis Mapper → Mapper XML → MySQL
+  → SupportProgramConditionCheck(도메인 규칙, 서울 기준 오늘)
+```
+
+조건 확인은 로그인 회원의 기업 소재지·설립연도로 현재 완료 분석 조건을 비교하며 AI를 호출하지 않습니다. 판정 규칙은
+[공고 분석](support-program-analysis.md#내-기업-조건-확인)에 있습니다.
 
 ### 공고별 공식 원문 근거 질문
 
@@ -981,6 +998,23 @@ FAILED/INTERRUPTED 역시 정상 근거 부족과 구분한다.
 신청서 작성 도우미, 실제 OpenAI 품질 평가는 포함하지 않는다.
 
 HWP 체크박스의 FORM_OBJECT Caption은 주변 문항과 함께 별도 근거 블록으로 보존한다. 공식 신청 문항의 단일 선택지는 AI Service가 원문 인용에 포함된 `options`로 추출하고(인용이 선택지 앞에서 끝나면 라벨·선택지 구간으로 넓히고, 원문에서 확인되지 않거나 하나뿐인 선택지는 양식을 거부하는 대신 그 문항만 자유 입력으로 둠), Core API가 다시 검증한 뒤 양식 스냅샷과 공개 응답에 보존한다. Frontend는 선택지를 라디오 버튼으로 표시한다. 기존 스냅샷에서 `options`가 없으면 빈 목록으로 읽으며, 선택형 문항의 선택지를 확인하지 못한 경우 공식 원문 확인을 안내한다.
+
+## 공고 분석(지원 형태·금액·조건)
+
+모집 중·예정 공고를 마감 임박 순으로 하나씩 AI로 분석해 V46 `support_program_analysis`에 저장합니다. 기본 비활성화
+(`SUPPORT_PROGRAM_ANALYSIS_ENABLED=false`)이며 서울 날짜 기준 하루 시작 공고 수를 `daily-limit`으로 제한합니다.
+분석 계약 v2는 공식 첨부 본문을 함께 보내고 제출 서류·선정 절차·평가 기준·일정을 추가로 받습니다.
+
+```text
+SupportProgramAnalysisWorker → SupportProgramAnalysisService
+  → SupportProgramAnalysisRepository(실행권 선점, 짧은 transaction)
+  → SupportProgramEvidenceService(기업마당 원문 캐시·수집)
+  → SupportProgramAttachmentTextFacade(제공처별 첨부 Client → SupportProgramDocumentParser)
+  → AiSupportProgramAnalysisClient → AI Service → OpenAI
+  → SupportProgramAnalysisRepository(같은 실행권일 때만 저장)
+```
+
+상태·지문·비용 제한·한계는 [공고 분석](support-program-analysis.md)을 참고하세요.
 
 ## 공고별 신청 양식 사전분석
 

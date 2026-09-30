@@ -88,6 +88,9 @@ GET /api/v1/support-programs/catalog?keyword=수출&region=서울&category=수�
 요청 도중 동기화되어도 두 조회의 세대가 어긋나지 않습니다.
 
 각 공고는 AI를 통과하지 않았으므로 `matchedReasons: []`, `recommendationScore: null`, `eligibilityReview: null`입니다.
+`analysisSummary`는 백그라운드 Worker가 미리 저장한 현재 완료 공고 분석이 있을 때만 채우며(없으면 `null`), 페이지를
+자른 뒤 그 페이지 공고만 한 번의 DB 조회로 읽습니다. 요청 중 AI를 호출하지 않습니다
+([공고 분석](support-program-analysis.md#목록검색-카드-요약)).
 API/DB 장애를 정상 0건 응답으로 바꾸지 않습니다.
 
 ## 프론트엔드 선택지 표시

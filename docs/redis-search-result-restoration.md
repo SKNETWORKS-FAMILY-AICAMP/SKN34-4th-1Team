@@ -80,14 +80,17 @@ GET 또는 POST /api/v1/support-programs/search
           → StringRedisTemplate → claim-search-result.lua → Redis
           → 토큰 존재·TTL·소유 계정 확인, 미귀속이면 최초 계정 연결
         → JSON을 Domain 스냅샷으로 복원
+        → SupportProgramAnalysisRepository.findCurrentSummaries → MySQL (복원 공고의 현재 분석 요약, 한 번 조회)
       → 보관된 전체 결과와 검색 조건 반환
 ```
 
 요청 본문은 `{ "resultToken": "발급받은 소문자 UUID" }`입니다. 회원 세션 쿠키와 기존 POST 요청의
 Origin/Referer 검증도 그대로 적용합니다. 복원은 검색의 AI 요청 제한을 소비하지 않습니다.
 
-복원 중 공고 카탈로그를 MySQL에서 다시 조회하지는 않지만, **회원 인증까지 MySQL 없이 처리하는 것은 아닙니다.**
-또한 복원 시점의 최신 공고·접수 상태·점수를 재계산하지 않고 검색 당시 결과를 반환합니다.
+복원 중 공고 목록·순위를 MySQL에서 다시 만들지는 않지만, **회원 인증과 카드용 분석 요약(`analysisSummary`)은
+MySQL을 읽습니다.** 분석 요약은 스냅샷에 저장하지 않고 복원할 때마다 복원 공고의 현재 완료 분석을 한 번에 다시 읽습니다
+([공고 분석](support-program-analysis.md#목록검색-카드-요약)). 그 밖에는 복원 시점의 최신 공고·접수 상태·점수를
+재계산하지 않고 검색 당시 결과를 반환합니다.
 그 사이 공고가 변경되거나 날짜가 바뀌어도 스냅샷을 자동 갱신하지 않으므로 최신 조건은 상세·원문에서 확인해야 합니다.
 
 프론트엔드의 [복원 Hook](../frontend/web/src/presentation/features/chat/hooks/useRestoreSupportProgramSearch.ts)은
@@ -114,7 +117,7 @@ Origin/Referer 검증도 그대로 적용합니다. 복원은 검색의 AI 요�
 | `payload` 항목 | 저장 내용 |
 |---|---|
 | `query` | 정규화된 검색어 |
-| `programs` | 최종 추천 전체. 공고 ID·제공처 코드, 제목·기관·요약, 분야·지역·대상, 신청 기간·접수 상태, 출처 URL, 추천 이유·점수·자격 검토 |
+| `programs` | 최종 추천 전체. 공고 ID·제공처 코드, 제목·기관·요약, 분야·지역·대상, 신청 기간·접수 상태, 출처 URL, 추천 이유·점수·자격 검토. 분석 요약은 저장하지 않음 |
 | `context.query` | 대화 복원용 검색 의도. 빈 GET 검색이면 `null`이고 상위 `query`는 `""` |
 | `context.acceptingOnly` | 접수 중인 공고만 검색했는지 여부 |
 | `context.companyConditions` | 이번 검색의 지역·업종·설립일·지원 목적. 미입력 필드는 `null` |
