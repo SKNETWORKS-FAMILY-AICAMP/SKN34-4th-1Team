@@ -2,15 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { SupportProgramDetail } from '@govbiz/shared/domain/entities/SupportProgram'
+import { splitSupportProgramTarget, supportProgramApplicationRouteLabel } from '@govbiz/shared/domain/entities/SupportProgramSections'
 import type { SupportProgramIdentity } from '@govbiz/shared/domain/repositories/SupportProgramRepository'
 import type { SupportProgramEvidenceAnswer } from '@govbiz/shared/domain/entities/SupportProgramEvidenceAnswer'
 import { savedSupportProgramDtoSchema, savedSupportProgramStatusDtoSchema } from '@govbiz/shared/data/models/SavedSupportProgramDto'
+import { toSupportProgramDetail } from '@govbiz/shared/data/models/SupportProgramDto'
+import { supportProgramConditionCheckDtoSchema, toSupportProgramConditionCheck } from '@govbiz/shared/data/models/SupportProgramConditionCheckDto'
+import type { SupportProgramConditionCheck } from '@govbiz/shared/domain/entities/SupportProgramConditionCheck'
 import { ApiError, apiRequest, errorMessage, programClient } from '../api/client'
 import { useAuth } from '../auth/session'
 import { statusLabels } from '../components/ProgramCard'
 import { AppIcon } from '../components/AppIcon'
 import { partnerDeadlineDay } from '../components/PartnerDates'
 import { PartnerSheet } from '../components/PartnerSheet'
+import { ProgramAnalysisCard, ProgramAnalysisFacts, ProgramAnalysisPreparation } from '../components/ProgramAnalysis'
 import { ProgramPreparationSection } from '../components/PreparationRows'
 import { Button, Card, Field, Notice, Page, StatusBadge, Subtitle, Title, colors, styles } from '../ui'
 
@@ -31,6 +36,7 @@ export function ProgramScreen({ identity, onLogin }: { identity: SupportProgramI
   const [answering, setAnswering] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [questionOpen, setQuestionOpen] = useState(false)
+  const [conditionCheck, setConditionCheck] = useState<SupportProgramConditionCheck | 'failed' | null>(null)
   const insets = useSafeAreaInsets()
   const work = useRef<AbortController | null>(null)
   const saveWork = useRef<AbortController | null>(null)
@@ -43,7 +49,7 @@ export function ProgramScreen({ identity, onLogin }: { identity: SupportProgramI
     const controller = new AbortController()
     setLoading(true); setError(null); setProgram(null)
     client.getDetail({ sourceCode, sourceProgramId }, controller.signal)
-      .then((value) => { if (active) setProgram(value) })
+      .then((value) => { if (active) setProgram(value ? toSupportProgramDetail(value) : null) })
       .catch((cause: unknown) => { if (active) setError(errorMessage(cause)) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false; controller.abort() }
@@ -64,6 +70,23 @@ export function ProgramScreen({ identity, onLogin }: { identity: SupportProgramI
       })
     return () => { active = false; controller.abort(); work.current?.abort(); saveWork.current?.abort() }
   }, [token, params, retry, invalidateSession])
+
+  const analyzed = program?.analysis.status === 'COMPLETED'
+  useEffect(() => {
+    // 분석을 마친 공고만 회원의 회사 정보로 조건을 비교합니다. 실패해도 분석 내용은 그대로 보여 주고 비교 실패만 알립니다.
+    setConditionCheck(null)
+    if (!token || !analyzed) return
+    let active = true
+    const controller = new AbortController()
+    apiRequest(`/api/v1/me/support-programs/condition-check?${params}`, { accessToken: token, signal: controller.signal })
+      .then((value) => { if (active) setConditionCheck(toSupportProgramConditionCheck(supportProgramConditionCheckDtoSchema.parse(value))) })
+      .catch((cause: unknown) => {
+        if (!active) return
+        if (cause instanceof ApiError && cause.status === 401) void invalidateSession().catch(() => undefined)
+        setConditionCheck('failed')
+      })
+    return () => { active = false; controller.abort() }
+  }, [token, analyzed, params, retry, invalidateSession])
 
   async function toggleSave() {
     if (!token) { onLogin(); return }
@@ -104,6 +127,9 @@ export function ProgramScreen({ identity, onLogin }: { identity: SupportProgramI
 
   const deadline = program?.applicationEndDate ? partnerDeadlineDay(program.applicationEndDate) : null
   const statusColor = program?.status === 'OPEN' ? colors.primary : program?.status === 'UPCOMING' ? colors.info : colors.muted
+  const target = program ? splitSupportProgramTarget(program.sourceCode, program.targetDescription) : null
+  const routeLabel = program ? supportProgramApplicationRouteLabel(program.applicationRoute) : null
+  const applicationUrl = program?.applicationRoute.url ?? null
   function closeQuestion() { work.current?.abort(); setAnswering(false); setQuestionOpen(false) }
   return <View style={local.page}><Page backgroundColor={colors.surface}>
     {loading && <ActivityIndicator color={colors.primary} accessibilityLabel="공고 상세를 불러오는 중" />}
@@ -114,15 +140,22 @@ export function ProgramScreen({ identity, onLogin }: { identity: SupportProgramI
         {deadline !== null && <StatusBadge label={deadline < 0 ? '마감' : deadline === 0 ? 'D-day' : `D-${deadline}`} tone={deadline >= 0 && deadline <= 3 ? 'warning' : 'neutral'} />}
         <View style={{ flex: 1 }} /><Text style={styles.muted}>{program.sourceName}</Text></View>
       <Title>{program.title}</Title>
-      <View style={local.glance}><View style={local.fact}><Text style={styles.muted}>접수 기간</Text><Text style={[styles.body, local.factValue]}>{program.applicationPeriod}</Text></View>
-        <View style={local.fact}><Text style={styles.muted}>지원 규모</Text><Text style={[styles.muted, local.factValue]}>공고문에서 확인해 주세요</Text></View></View>
+      {program.analysis.status === 'COMPLETED' && program.analysis.summaryLine && <Text style={styles.body}><Text style={local.aiLabel}>AI 요약 </Text>{program.analysis.summaryLine}</Text>}
+      <View style={local.glance}>{program.analysis.status === 'COMPLETED' && <ProgramAnalysisFacts analysis={program.analysis} />}<View style={local.fact}><Text style={styles.muted}>접수 기간</Text><Text style={[styles.body, local.factValue]}>{program.applicationPeriod}</Text></View>
+        <View style={local.fact}><Text style={styles.muted}>신청 방법</Text><Text style={[routeLabel ? styles.body : styles.muted, local.factValue]}>{routeLabel ?? '공고 원문에서 확인해 주세요'}</Text></View></View>
+      <ProgramAnalysisCard analysis={program.analysis} check={conditionCheck} signedIn={Boolean(token)} />
+      <ProgramAnalysisPreparation analysis={program.analysis} />
       {token && saved && <ProgramPreparationSection key={`${token}:${sourceCode}:${sourceProgramId}`} identity={identity} token={token} />}
       {saveError && <><Notice error>{saveError}</Notice><Button variant="ghost" label="저장 상태 다시 확인" onPress={() => setRetry((value) => value + 1)} /></>}
       {expanded && <><Subtitle>{program.organization}</Subtitle><Card>
-        <Text style={styles.heading}>지원 대상</Text><Text style={styles.body}>{program.targetDescription || '원문을 확인해 주세요.'}</Text>
+        <Text style={styles.heading}>지원 대상</Text><Text style={styles.body}>{target?.target || '원문을 확인해 주세요.'}</Text>
+        {target?.excluded && <><Text style={styles.heading}>제외 대상</Text><Text style={styles.body}>{target.excluded}</Text></>}
         <Text style={styles.muted}>{program.regions.join(' · ')} / {program.categories.join(' · ')}</Text>
       </Card>
       <Card><Text style={styles.heading}>사업 내용</Text><Text selectable style={styles.body}>{program.summary || '공고 원문에서 확인해 주세요.'}</Text></Card>
+      {program.applicationRoute.method && <Card><Text style={styles.heading}>신청 방법</Text><Text selectable style={styles.body}>{program.applicationRoute.method}</Text></Card>}
+      {applicationUrl && <Button variant="secondary" label={program.applicationRoute.type === 'GOOGLE_FORMS' ? '구글 설문 신청서 열기' : '신청 사이트 열기'}
+        onPress={() => void openSource(applicationUrl)} />}
       <Notice>공고 정보는 신청 자격의 확정 판정이 아닙니다. 제출 전 공식 공고의 요건과 마감일을 확인해 주세요.</Notice>
       <Button label={program.sourceCode === 'CNTRADE_NOTICE' ? '공식 공지 목록 열기' : '공식 공고 원문 열기'} onPress={() => void openSource(program.sourceUrl)} />
       </>}
@@ -166,6 +199,7 @@ const local = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 5, height: 5, borderRadius: 3 },
   status: { fontSize: 12, fontWeight: '600' },
+  aiLabel: { fontSize: 12, fontWeight: '700', color: colors.primary },
   glance: { backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 12 },
   fact: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   factValue: { flex: 1, textAlign: 'right' },

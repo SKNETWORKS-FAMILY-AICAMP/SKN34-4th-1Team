@@ -20,6 +20,7 @@ export const supportPrograms: SupportProgram[] = [
     matchedReasons: ['AI·기술 분야', '서울 지역', '현재 접수 중'],
     recommendationScore: 94,
     eligibilityReview: null,
+    analysisSummary: null,
   },
   {
     sourceCode: 'BIZINFO',
@@ -39,6 +40,7 @@ export const supportPrograms: SupportProgram[] = [
     matchedReasons: ['창업 분야', '전국 사업', '현재 접수 중'],
     recommendationScore: 90,
     eligibilityReview: null,
+    analysisSummary: null,
   },
   {
     sourceCode: 'BIZINFO',
@@ -58,6 +60,7 @@ export const supportPrograms: SupportProgram[] = [
     matchedReasons: ['제조·기술 분야', '경기 지역', '현재 접수 중'],
     recommendationScore: 88,
     eligibilityReview: null,
+    analysisSummary: null,
   },
   {
     sourceCode: 'BIZINFO',
@@ -77,6 +80,7 @@ export const supportPrograms: SupportProgram[] = [
     matchedReasons: ['수출·해외진출 분야', '전국 사업', '현재 접수 중'],
     recommendationScore: 86,
     eligibilityReview: null,
+    analysisSummary: null,
   },
   {
     sourceCode: 'BIZINFO',
@@ -96,6 +100,7 @@ export const supportPrograms: SupportProgram[] = [
     matchedReasons: ['콘텐츠·창업 분야', '전국 사업', '현재 접수 중'],
     recommendationScore: 84,
     eligibilityReview: null,
+    analysisSummary: null,
   },
   {
     sourceCode: 'BIZINFO',
@@ -115,6 +120,7 @@ export const supportPrograms: SupportProgram[] = [
     matchedReasons: ['기술·창업 분야', '대전 지역'],
     recommendationScore: 72,
     eligibilityReview: null,
+    analysisSummary: null,
   },
 ]
 
@@ -181,6 +187,7 @@ export function toSupportProgramDetailFixture(program: SupportProgram): SupportP
     sourceUrl: program.sourceUrl,
     evidenceQuestionSupported: program.sourceCode === 'BIZINFO',
     applicationRoute: { method: null, url: null, type: 'UNKNOWN' },
+    analysis: { status: 'NOT_ANALYZED' },
   }
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 
 import type { SupportProgram } from '../../../../domain/entities/SupportProgram'
+import { supportProgramAnalysisFacts } from '../../../../domain/entities/SupportProgramSections'
 import { catalogSourceCodes, catalogSourceLabels, type SupportProgramCatalogFilters } from '../../../../domain/entities/SupportProgramCatalog'
 import { isAppPath, supportProgramDetailPath } from '../../../shared/routes/appPaths'
 import { defaultCatalogFilters, joinFilterValues, readCatalogFilters, splitFilterValues, writeCatalogFilters } from '../../../shared/support-program/catalogSearchParams'
@@ -171,11 +172,14 @@ function CatalogExtraSelect({ label, options, selected, onSelect }: {
 }
 function CatalogRow({ program, returnTo, inApp }: { program: SupportProgram; returnTo: string; inApp: boolean }) {
   const detailPath = supportProgramDetailPath({ sourceCode: program.sourceCode, sourceProgramId: program.id }, inApp, returnTo)
+  const facts = supportProgramAnalysisFacts(program.analysisSummary)
   return <article className="grid min-w-0 grid-cols-[minmax(0,1fr)_10rem_10rem] gap-5 border-t border-sample-border px-5 py-5 first:border-t-0 hover:bg-[#fafcfb] max-chat:grid-cols-1 max-chat:gap-2 max-chat:px-4">
     <div className="min-w-0">
       <p className="mt-0 mb-2 truncate text-xs font-semibold text-brand-primary">{program.categories.join(' · ') || '분야 미분류'} <span className="font-normal text-sample-muted">{program.regions.length ? ` / ${program.regions.join(' · ')}` : ''}</span></p>
       <h3 className="m-0 text-sm font-bold leading-relaxed [overflow-wrap:anywhere]"><Link className="rounded hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
         to={detailPath} state={{ searchReturnTo: returnTo }}>{program.title}</Link></h3>
+      {/* 공고 분석을 마친 공고만 지원 규모·지원 형태를 한 줄로 덧붙입니다. */}
+      {facts.length ? <p className="mt-1.5 mb-0 truncate text-xs font-semibold text-app-ink">{facts.join(' · ')}</p> : null}
     </div>
     <p className="m-0 self-center text-xs leading-relaxed text-sample-muted [overflow-wrap:anywhere]">{program.organization || program.sourceName}</p>
     <div className="self-center max-chat:flex max-chat:flex-wrap max-chat:items-center max-chat:gap-2">

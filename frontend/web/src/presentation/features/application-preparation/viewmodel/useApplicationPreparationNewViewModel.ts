@@ -16,7 +16,7 @@ import { useSavedSupportProgramChoices } from '../../../shared/support-program/u
 import type { WorkspaceToastNotice } from '../../../shared/workspace/WorkspaceToast'
 
 /** 신청 준비가 공고 선택에 쓰는 필드입니다. 검색 결과·관심 공고·상세 조회 어느 쪽에서 골라도 같습니다. */
-export type SelectableSupportProgram = Omit<SupportProgram, 'matchedReasons' | 'recommendationScore' | 'eligibilityReview'>
+export type SelectableSupportProgram = Omit<SupportProgram, 'matchedReasons' | 'recommendationScore' | 'eligibilityReview' | 'analysisSummary'>
 
 /** 저장된 양식 조회(AI 호출 없음) 상태입니다. ready는 양식이 있든 없든 조회를 마친 상태입니다. */
 export type AvailabilityLookup =

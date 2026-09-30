@@ -30,6 +30,8 @@ import type {
 } from '../../domain/usecases/PartnerRecruitmentUseCases'
 import type { AdminAccountRepository } from '../../domain/repositories/AdminAccountRepository'
 import type { SavedSupportProgramRepository } from '../../domain/repositories/SavedSupportProgramRepository'
+import type { SupportProgramConditionCheckRepository } from '../../domain/repositories/SupportProgramConditionCheckRepository'
+import type { CheckSupportProgramConditionsUseCase } from '../../domain/usecases/CheckSupportProgramConditionsUseCase'
 import type {
   BrowseSavedSupportProgramsUseCase,
   CheckSavedSupportProgramUseCase,
@@ -95,8 +97,10 @@ export type AppCradle = {
   askAssistantUseCase: AskAssistantUseCase
   adminAccountRepository: AdminAccountRepository
   savedSupportProgramRepository: SavedSupportProgramRepository
+  supportProgramConditionCheckRepository: SupportProgramConditionCheckRepository
   browseSavedSupportProgramsUseCase: BrowseSavedSupportProgramsUseCase
   checkSavedSupportProgramUseCase: CheckSavedSupportProgramUseCase
+  checkSupportProgramConditionsUseCase: CheckSupportProgramConditionsUseCase
   saveSupportProgramUseCase: SaveSupportProgramUseCase
   removeSavedSupportProgramUseCase: RemoveSavedSupportProgramUseCase
   getAdminAccountStatsUseCase: GetAdminAccountStatsUseCase

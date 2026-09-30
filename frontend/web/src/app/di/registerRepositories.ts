@@ -13,6 +13,7 @@ import { PartnerProposalRepositoryImpl } from '../../data/repositories/PartnerPr
 import { PartnerRecruitmentRepositoryImpl } from '../../data/repositories/PartnerRecruitmentRepositoryImpl'
 import { SampleItemRepositoryImpl } from '../../data/repositories/SampleItemRepositoryImpl'
 import { SupportProgramRepositoryImpl } from '../../data/repositories/SupportProgramRepositoryImpl'
+import { SupportProgramConditionCheckRepositoryImpl } from '../../data/repositories/SupportProgramConditionCheckRepositoryImpl'
 import type { AppContainer } from './types'
 
 /** Data Layer의 Repository 구현체와 앱 수명주기를 등록합니다. */
@@ -26,6 +27,7 @@ export function registerRepositories(container: AppContainer) {
     assistantRepository: asClass(AssistantRepositoryImpl).singleton(),
     adminAccountRepository: asClass(AdminAccountRepositoryImpl).singleton(),
     savedSupportProgramRepository: asClass(SavedSupportProgramRepositoryImpl).singleton(),
+    supportProgramConditionCheckRepository: asClass(SupportProgramConditionCheckRepositoryImpl).singleton(),
     companyRepository: asClass(CompanyRepositoryImpl).singleton(),
     partnerProposalRepository: asClass(PartnerProposalRepositoryImpl).singleton(),
     partnerRecruitmentRepository: asClass(PartnerRecruitmentRepositoryImpl).singleton(),

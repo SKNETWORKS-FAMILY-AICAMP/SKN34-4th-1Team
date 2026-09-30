@@ -27,5 +27,5 @@ export const programDetail: SupportProgramDetail = {
   sourceCode: 'BIZINFO', id: 'P/123', title: '테스트 지원사업', organization: '기관', summary: '사업 내용', categories: [], regions: [],
   targetDescription: '중소기업', applicationPeriod: '상시', applicationStartDate: null, applicationEndDate: null, status: 'OPEN',
   sourceName: '기업마당', sourceUrl: 'https://www.bizinfo.go.kr/program', evidenceQuestionSupported: true,
-  applicationRoute: { method: null, url: null, type: 'UNKNOWN' },
+  applicationRoute: { method: null, url: null, type: 'UNKNOWN' }, analysis: { status: 'NOT_ANALYZED' },
 }

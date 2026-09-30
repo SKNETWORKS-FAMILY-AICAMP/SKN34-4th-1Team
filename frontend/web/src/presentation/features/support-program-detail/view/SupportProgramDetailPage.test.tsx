@@ -138,6 +138,193 @@ describe('상세 오류 복구와 검색 화면 복귀', () => {
   })
 })
 
+describe('공식 신청 경로와 제외 대상 표시', () => {
+  it('신청 방법을 분류해 보여 주고 공식 신청 사이트를 새 창 링크로 연다', async () => {
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({
+      ...supportProgramDetails[0],
+      applicationRoute: { method: '온라인 접수 후 사업계획서 제출', url: 'https://apply.example.go.kr/form', type: 'OTHER_ONLINE_FORM' },
+    })
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.getByText('온라인 신청 (접수 사이트)')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '신청 방법' })).toBeTruthy()
+    expect(screen.getByText('온라인 접수 후 사업계획서 제출')).toBeTruthy()
+    const apply = screen.getByRole('link', { name: '신청 사이트 열기 ↗' })
+    expect(apply.getAttribute('href')).toBe('https://apply.example.go.kr/form')
+    expect(apply.getAttribute('target')).toBe('_blank')
+    expect(screen.queryByText('지원 규모')).toBeNull()
+  })
+
+  it('신청 경로를 모르면 원문 확인을 안내하고 신청 링크를 두지 않는다', async () => {
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue(supportProgramDetails[0])
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.getByText('공고 원문에서 확인해 주세요')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '신청 방법' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /신청 사이트 열기|구글 설문 신청서 열기/ })).toBeNull()
+  })
+
+  it('K-Startup 공고는 지원 대상과 제외 대상을 나눠 보여 준다', async () => {
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({
+      ...supportProgramDetails[0], sourceCode: 'KSTARTUP', evidenceQuestionSupported: false,
+      targetDescription: '지원 대상: 창업 3년 이내 기업\n제외 대상: 휴·폐업 중인 기업',
+    })
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.getByText('창업 3년 이내 기업')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '제외 대상' })).toBeTruthy()
+    expect(screen.getByText('휴·폐업 중인 기업')).toBeTruthy()
+  })
+})
+
+describe('공고 분석 표시', () => {
+  const evidence = { field: 'TARGET_DESCRIPTION' as const, quote: '창업 7년 이내 중소기업', attachmentName: null }
+  const values = { regions: null, minYears: null, maxYears: null, minAge: null, maxAge: null }
+  // 첨부파일 분석 항목이 없는 분석입니다.
+  const noAttachmentItems = { requiredDocuments: [], selectionSteps: [], evaluationCriteria: [], schedule: [], sourceAttachmentNames: [] }
+
+  it('분석을 마친 공고는 AI 요약 · 지원 규모 · 조건 묶음과 원문 인용을 보여 준다', async () => {
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({
+      ...supportProgramDetails[0],
+      analysis: {
+        status: 'COMPLETED', analyzedAt: '2026-10-01T10:00:00', summaryLine: '창업기업에 최대 5천만원 사업화 자금',
+        supportTypes: ['GRANT', 'CONSULTING'],
+        supportAmount: { text: '최대 5천만원', maxAmountKrw: 50_000_000, evidence: { field: 'SUMMARY', quote: '최대 5천만원', attachmentName: null } },
+        selectionScale: { text: '20개사 내외', evidence: { field: 'SUMMARY', quote: '20개사 내외', attachmentName: null } },
+        conditions: [
+          { kind: 'EXCLUDED', category: 'OTHER', text: '국세 체납 기업', values, evidence },
+          { kind: 'REQUIRED', category: 'BUSINESS_AGE', text: '창업 7년 이내', values: { ...values, maxYears: 7 }, evidence },
+        ],
+        contact: { text: '창업진흥과 02-000-0000', evidence: { field: 'DETAIL_TEXT', quote: '문의 02-000-0000', attachmentName: null } },
+        ...noAttachmentItems,
+      },
+    })
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.getByText('창업기업에 최대 5천만원 사업화 자금')).toBeTruthy()
+    expect(screen.getByText('최대 5천만원')).toBeTruthy()
+    expect(screen.getByText('20개사 내외')).toBeTruthy()
+    expect(screen.getByText('사업화 자금')).toBeTruthy()
+    const analysis = screen.getByRole('region', { name: '공고 분석' })
+    const headings = within(analysis).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    expect(headings).toEqual(['신청 조건', '제외 대상', '문의처'])
+    expect(within(analysis).getByText('창업 7년 이내')).toBeTruthy()
+    expect(within(analysis).getAllByText('원문 근거 · 지원 대상')).toHaveLength(2)
+    expect(within(analysis).getByText('원문 근거 · 공고 상세 본문')).toBeTruthy()
+  })
+
+  it('첨부 공고문까지 분석한 공고는 일정 · 제출 서류 · 선정 절차 · 평가 기준을 첨부 인용과 함께 보여 준다', async () => {
+    const attachment = { field: 'ATTACHMENT' as const, quote: '사업계획서 1부', attachmentName: '공고문.hwpx' }
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({
+      ...supportProgramDetails[0],
+      analysis: {
+        status: 'COMPLETED', analyzedAt: '2026-10-01T10:00:00', summaryLine: null, supportTypes: [], supportAmount: null,
+        selectionScale: null, conditions: [], contact: null,
+        schedule: [{ label: '발표평가', date: null, text: '11월 중', evidence: attachment }],
+        requiredDocuments: [{ name: '사업계획서', requirement: 'REQUIRED', note: null, evidence: attachment }],
+        selectionSteps: [{ name: '서류평가', note: null, evidence: attachment }, { name: '발표평가', note: '온라인', evidence: attachment }],
+        evaluationCriteria: [{ item: '사업성', points: 40, evidence: attachment }],
+        sourceAttachmentNames: ['공고문.hwpx'],
+      },
+    })
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    const preparation = screen.getByRole('region', { name: '신청 준비' })
+    expect(within(preparation).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent))
+      .toEqual(['일정', '제출 서류', '선정 절차', '평가 기준'])
+    expect(within(preparation).getByText('날짜 미정')).toBeTruthy()
+    expect(within(preparation).getByText('AI 정리 · 첨부 공고문.hwpx')).toBeTruthy()
+    expect(within(preparation).getByText('필수')).toBeTruthy()
+    expect(within(preparation).getByText('2단계')).toBeTruthy()
+    expect(within(preparation).getByText('발표평가 · 온라인')).toBeTruthy()
+    expect(within(preparation).getByText('40점')).toBeTruthy()
+    expect(within(preparation).getAllByText('원문 근거 · 첨부파일 공고문.hwpx')).toHaveLength(5)
+  })
+
+  it('로그인한 회원에게 회사 정보 기준 조건 판정을 조건마다 보여 준다', async () => {
+    const analysis = {
+      status: 'COMPLETED' as const, analyzedAt: '2026-10-01T10:00:00', summaryLine: null, supportTypes: [], supportAmount: null,
+      selectionScale: null, contact: null, ...noAttachmentItems,
+      conditions: [
+        { kind: 'REQUIRED' as const, category: 'REGION' as const, text: '서울 소재 기업', values: { ...values, regions: ['서울'] }, evidence },
+        { kind: 'EXCLUDED' as const, category: 'OTHER' as const, text: '국세 체납 기업', values, evidence },
+      ],
+    }
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({ ...supportProgramDetails[0], analysis })
+    vi.spyOn(appContainer.resolve('checkSavedSupportProgramUseCase'), 'execute').mockResolvedValue(false)
+    const check = vi.spyOn(appContainer.resolve('checkSupportProgramConditionsUseCase'), 'execute').mockResolvedValue({
+      status: 'CHECKED', analyzedAt: '2026-10-01T10:00:00', referenceDate: '2026-10-01', profile: { region: '부산', foundedYear: 2021 },
+      overall: 'NOT_MET',
+      conditions: [{ index: 0, result: 'NOT_MET', reason: 'REGION_MISMATCH' }, { index: 1, result: 'UNKNOWN', reason: 'NOT_COMPARABLE' }],
+    })
+    renderDetail(null, undefined, memberAccount)
+    expect(await screen.findByText('대상 아님 가능성')).toBeTruthy()
+    expect(check).toHaveBeenCalledWith({ sourceCode: supportPrograms[0].sourceCode, sourceProgramId: supportPrograms[0].id }, expect.any(AbortSignal))
+    const region = screen.getByText('서울 소재 기업').closest('li') as HTMLElement
+    expect(within(region).getByText('미충족')).toBeTruthy()
+    expect(within(region).getByText('회사 소재지(부산)가 해당 지역이 아니에요')).toBeTruthy()
+    const excluded = screen.getByText('국세 체납 기업').closest('li') as HTMLElement
+    expect(within(excluded).getByText('확인 필요')).toBeTruthy()
+  })
+
+  it('회사 정보가 없으면 등록을 안내하고, 다른 분석으로 판정한 결과는 쓰지 않는다', async () => {
+    const analysis = { status: 'COMPLETED' as const, analyzedAt: '2026-10-01T10:00:00', summaryLine: null, supportTypes: [], supportAmount: null, selectionScale: null, contact: null, ...noAttachmentItems,
+      conditions: [{ kind: 'REQUIRED' as const, category: 'REGION' as const, text: '서울 소재 기업', values: { ...values, regions: ['서울'] }, evidence }] }
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({ ...supportProgramDetails[0], analysis })
+    vi.spyOn(appContainer.resolve('checkSavedSupportProgramUseCase'), 'execute').mockResolvedValue(false)
+    const check = vi.spyOn(appContainer.resolve('checkSupportProgramConditionsUseCase'), 'execute').mockResolvedValueOnce({ status: 'NO_COMPANY' })
+    renderDetail(null, undefined, memberAccount)
+    expect((await screen.findByRole('link', { name: '회사 정보 등록' })).getAttribute('href')).toBe('/app/welcome/company')
+    cleanup()
+
+    check.mockResolvedValueOnce({ status: 'CHECKED', analyzedAt: '2026-09-01T10:00:00', referenceDate: '2026-10-01', profile: { region: '서울', foundedYear: 2021 },
+      overall: 'MET', conditions: [{ index: 0, result: 'MET', reason: 'REGION_MATCH' }] })
+    renderDetail(null, undefined, memberAccount)
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    await vi.waitFor(() => expect(check).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('조건 충족')).toBeNull()
+    expect(screen.queryByText('충족')).toBeNull()
+  })
+
+  it('비로그인은 로그인하고 비교하기를 안내하고 판정을 요청하지 않는다', async () => {
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({
+      ...supportProgramDetails[0],
+      analysis: { status: 'COMPLETED', analyzedAt: '2026-10-01T10:00:00', summaryLine: null, supportTypes: [], supportAmount: null, selectionScale: null, conditions: [], contact: null, requiredDocuments: [], selectionSteps: [], evaluationCriteria: [], schedule: [], sourceAttachmentNames: [] },
+    })
+    const check = vi.spyOn(appContainer.resolve('checkSupportProgramConditionsUseCase'), 'execute')
+    renderDetail()
+    expect((await screen.findByRole('link', { name: '로그인하고 내 회사 조건과 비교하기' })).getAttribute('href')).toMatch(/^\/login\?next=/)
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('본문에 지원 규모가 없으면 명시 없음으로 밝힌다', async () => {
+    vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute').mockResolvedValue({
+      ...supportProgramDetails[0],
+      analysis: { status: 'COMPLETED', analyzedAt: '2026-10-01T10:00:00', summaryLine: null, supportTypes: [], supportAmount: null, selectionScale: null, conditions: [], contact: null, requiredDocuments: [], selectionSteps: [], evaluationCriteria: [], schedule: [], sourceAttachmentNames: [] },
+    })
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.getByText('공고 본문에 명시 없음')).toBeTruthy()
+    expect(screen.getByText('공고 본문에 명시된 신청 조건이 없어요. 원문 공고에서 확인해 주세요.')).toBeTruthy()
+    expect(screen.queryByText('AI 요약')).toBeNull()
+  })
+
+  it('분석 실패는 숨기지 않고, 분석 전 공고에는 분석 카드와 지원 규모 줄을 두지 않는다', async () => {
+    const detail = vi.spyOn(appContainer.resolve('getSupportProgramDetailUseCase'), 'execute')
+      .mockResolvedValueOnce({ ...supportProgramDetails[0], analysis: { status: 'FAILED' } })
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.getByText('분석 실패')).toBeTruthy()
+    cleanup()
+
+    detail.mockResolvedValueOnce(supportProgramDetails[0])
+    renderDetail()
+    await screen.findByRole('heading', { name: supportPrograms[0].title })
+    expect(screen.queryByRole('region', { name: '공고 분석' })).toBeNull()
+    expect(screen.queryByText('지원 규모')).toBeNull()
+  })
+})
+
 const memberAccount: Account = { email: 'member@govbiz.local', role: 'USER', tier: 'MEMBER', emailVerified: true, hasPassword: true, accountType: null, onboarded: true, company: null }
 
 function renderDetail(

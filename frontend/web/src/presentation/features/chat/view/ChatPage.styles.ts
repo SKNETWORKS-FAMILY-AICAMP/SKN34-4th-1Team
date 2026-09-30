@@ -175,6 +175,7 @@ export const chatPageStyles = {
   programTitle:
     'mt-3 mb-[0.18rem] text-[1.02rem] font-bold tracking-[-0.025em] text-app-ink',
   programOrganization: 'm-0 text-[0.75rem] text-sample-muted',
+  programFacts: 'mt-2 mb-0 flex flex-col gap-0.5 text-[0.8rem] leading-[1.5] text-app-ink [&_strong]:font-semibold',
   programSummary: 'my-3 text-[0.82rem] leading-[1.55] text-sample-muted',
   programDetails: classes(
     'flex flex-col items-start justify-between gap-1 rounded-[0.65rem] p-[0.7rem]',

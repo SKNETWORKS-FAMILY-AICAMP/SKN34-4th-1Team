@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import type { SupportProgram, SupportProgramEligibilityAxis } from '../../../../domain/entities/SupportProgram'
+import { supportProgramAnalysisFacts } from '../../../../domain/entities/SupportProgramSections'
 import { loginPathFor, signupPathFor } from '../../../shared/auth/returnPath'
 import { appPaths, isAppPath, supportProgramDetailPath } from '../../../shared/routes/appPaths'
 import { getSupportProgramEligibilityKind } from '../supportProgramEligibility'
@@ -80,6 +81,7 @@ function ProgramCard({ program, interests }: { program: SupportProgram; interest
   const review = program.eligibilityReview
   const eligibilityKind = getSupportProgramEligibilityKind(program)
   const identity = { sourceCode: program.sourceCode, sourceProgramId: program.id }
+  const facts = supportProgramAnalysisFacts(program.analysisSummary)
   const interestKey = searchResultInterestKey(identity)
   const isSaved = interests?.savedKeys.has(interestKey) ?? false
   const isSaving = interests?.pendingKeys.has(interestKey) ?? false
@@ -120,6 +122,13 @@ function ProgramCard({ program, interests }: { program: SupportProgram; interest
         {program.title}
       </h2>
       <p className={chatPageStyles.programOrganization}>{program.organization}</p>
+      {/* 공고 분석을 마친 공고는 AI 요약 한 줄과 지원 규모·지원 형태를 먼저 보여 줍니다. */}
+      {program.analysisSummary ? (
+        <p className={chatPageStyles.programFacts}>
+          {program.analysisSummary.summaryLine ? <span>AI 요약 · {program.analysisSummary.summaryLine}</span> : null}
+          {facts.length ? <strong>{facts.join(' · ')}</strong> : null}
+        </p>
+      ) : null}
       <p className={chatPageStyles.programSummary}>{program.summary}</p>
       <div className={chatPageStyles.programDetails}>
         <span>{program.targetDescription}</span>

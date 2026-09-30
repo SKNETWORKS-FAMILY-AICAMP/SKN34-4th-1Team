@@ -291,17 +291,24 @@ describe('getSupportProgramSearchReadinessApi', () => {
   })
 })
 
+const notAnalyzedDto = {
+  status: 'NOT_ANALYZED', analyzedAt: null, summaryLine: null, supportTypes: [], supportAmount: null, selectionScale: null, conditions: [], contact: null,
+  requiredDocuments: [], selectionSteps: [], evaluationCriteria: [], schedule: [], sourceAttachmentNames: [],
+}
+
 describe('getSupportProgramDetailApi', () => {
   it('uses the complete source identity and maps the detail response', async () => {
     const controller = new AbortController()
     const detail = supportProgramDetails[0]
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse(detail)))
+    // 서버는 분석 전 공고도 모든 분석 필드를 보내고, Repository가 Domain 값으로 옮기면 상태만 남습니다.
+    const detailDto = { ...detail, analysis: notAnalyzedDto }
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse(detailDto)))
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(getSupportProgramDetailApi({
       sourceCode: detail.sourceCode,
       sourceProgramId: detail.id,
-    }, controller.signal)).resolves.toEqual(detail)
+    }, controller.signal)).resolves.toEqual(detailDto)
 
     const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     const url = new URL(requestUrl)
@@ -329,6 +336,7 @@ describe('getSupportProgramDetailApi', () => {
   it('rejects a successful response whose source identity differs from the request', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
       ...supportProgramDetails[0],
+      analysis: notAnalyzedDto,
       id: 'different-program-id',
     })))
 

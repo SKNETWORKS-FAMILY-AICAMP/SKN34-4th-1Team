@@ -25,6 +25,17 @@ describe('ProgramResults', () => {
     expect(within(results).queryByText('검색 결과의 순서를 유지합니다. 관련도와 신청 자격은 다르며, 각 공고의 조건 확인·확인 필요 표시를 확인하세요.')).toBeNull()
   })
 
+  it('공고 분석을 마친 결과만 AI 요약과 지원 규모·지원 형태를 보여 준다', () => {
+    const analyzed = { ...supportPrograms[0], analysisSummary: {
+      summaryLine: '창업기업에 사업화 자금 지원', supportAmountText: '최대 5천만원', maxAmountKrw: 50_000_000, supportTypes: ['GRANT' as const],
+    } }
+    render(<ProgramResults programs={[analyzed, supportPrograms[1]]} />, { wrapper: SearchRouter })
+    const [first, second] = screen.getAllByRole('article')
+    expect(within(first).getByText('AI 요약 · 창업기업에 사업화 자금 지원')).toBeTruthy()
+    expect(within(first).getByText('최대 5천만원 · 사업화 자금')).toBeTruthy()
+    expect(within(second).queryByText(/AI 요약/)).toBeNull()
+  })
+
   it('비로그인 결과에는 관심 버튼이 없다', () => {
     render(<ProgramResults programs={[relocationReviewRequiredProgram]} />, { wrapper: SearchRouter })
     expect(screen.queryByRole('button', { name: /관심/ })).toBeNull()

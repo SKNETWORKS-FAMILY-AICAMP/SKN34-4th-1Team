@@ -66,6 +66,7 @@ import { VerifyPasswordResetCodeUseCase } from '../../domain/usecases/VerifyPass
 import { VerifySignupEmailCodeUseCase } from '../../domain/usecases/VerifySignupEmailCodeUseCase'
 import { SignUpUseCase } from '../../domain/usecases/SignUpUseCase'
 import { InterpretSupportProgramConversationUseCase } from '../../domain/usecases/InterpretSupportProgramConversationUseCase'
+import { CheckSupportProgramConditionsUseCase } from '../../domain/usecases/CheckSupportProgramConditionsUseCase'
 import type { AppContainer, AppCradle } from './types'
 
 /** Domain UseCase와 UseCase가 필요로 하는 Repository 연결을 등록합니다. */
@@ -123,6 +124,10 @@ export function registerUseCases(container: AppContainer) {
     ).singleton(),
     checkSavedSupportProgramUseCase: asFunction(
       ({ savedSupportProgramRepository }: Pick<AppCradle, 'savedSupportProgramRepository'>) => new CheckSavedSupportProgramUseCase(savedSupportProgramRepository),
+    ).singleton(),
+    checkSupportProgramConditionsUseCase: asFunction(
+      ({ supportProgramConditionCheckRepository }: Pick<AppCradle, 'supportProgramConditionCheckRepository'>) =>
+        new CheckSupportProgramConditionsUseCase(supportProgramConditionCheckRepository),
     ).singleton(),
     saveSupportProgramUseCase: asFunction(
       ({ savedSupportProgramRepository }: Pick<AppCradle, 'savedSupportProgramRepository'>) => new SaveSupportProgramUseCase(savedSupportProgramRepository),
