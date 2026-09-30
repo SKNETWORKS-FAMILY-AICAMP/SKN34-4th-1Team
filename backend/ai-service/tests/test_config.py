@@ -18,6 +18,8 @@ def configure_required_openai_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LLM_RANKING_RUN_TIMEOUT_SECONDS", raising=False)
     monkeypatch.delenv("LLM_COMBINATION_REVIEW_MODEL_TIMEOUT_SECONDS", raising=False)
     monkeypatch.delenv("LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("LLM_ANALYSIS_RUN_TIMEOUT_SECONDS", raising=False)
     monkeypatch.delenv("OPENAI_RANKING_MODEL", raising=False)
     monkeypatch.delenv("OPENAI_RANKING_REASONING_EFFORT", raising=False)
     monkeypatch.delenv("OPENAI_RANKING_SERVICE_TIER", raising=False)
@@ -281,6 +283,35 @@ def test_invalid_combination_review_timeouts_fail_startup(monkeypatch, name, val
 def test_combination_review_model_deadline_must_be_less_than_run_deadline(monkeypatch, model, run):
     monkeypatch.setenv("LLM_COMBINATION_REVIEW_MODEL_TIMEOUT_SECONDS", str(model))
     monkeypatch.setenv("LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS", str(run))
+    with pytest.raises(SettingsConfigurationError, match="must be less than"):
+        Settings.from_environment()
+
+
+def test_support_program_analysis_has_independent_90_100_second_defaults(monkeypatch):
+    settings = Settings.from_environment()
+    assert (settings.llm_analysis_model_timeout_seconds, settings.llm_analysis_run_timeout_seconds) == (90, 100)
+    monkeypatch.setenv("LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS", " 90.5 ")
+    monkeypatch.setenv("LLM_ANALYSIS_RUN_TIMEOUT_SECONDS", "120")
+    changed = Settings.from_environment()
+    assert (changed.llm_analysis_model_timeout_seconds, changed.llm_analysis_run_timeout_seconds) == (90.5, 120)
+    assert (changed.llm_model_timeout_seconds, changed.llm_run_timeout_seconds) == (
+        settings.llm_model_timeout_seconds, settings.llm_run_timeout_seconds,
+    )
+
+
+@pytest.mark.parametrize("name", ["LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS", "LLM_ANALYSIS_RUN_TIMEOUT_SECONDS"])
+@pytest.mark.parametrize("value", ["", "private-invalid-setting", "0", "-1", "nan", "inf", "-inf", "120.01"])
+def test_invalid_support_program_analysis_timeouts_fail_startup(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    with pytest.raises(SettingsConfigurationError, match=name) as captured:
+        Settings.from_environment()
+    assert "private-invalid-setting" not in str(captured.value)
+
+
+@pytest.mark.parametrize("model,run", [(70, 70), (80, 70), (120, 120)])
+def test_support_program_analysis_model_deadline_must_be_less_than_run_deadline(monkeypatch, model, run):
+    monkeypatch.setenv("LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS", str(model))
+    monkeypatch.setenv("LLM_ANALYSIS_RUN_TIMEOUT_SECONDS", str(run))
     with pytest.raises(SettingsConfigurationError, match="must be less than"):
         Settings.from_environment()
 

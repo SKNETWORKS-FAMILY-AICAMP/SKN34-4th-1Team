@@ -101,6 +101,7 @@ PUT /internal/v1/support-program-evidence/chunks
 POST /internal/v1/support-program-evidence/search
 POST /internal/v1/support-program-evidence/answers
 POST /internal/v1/support-program-conversation/interpret
+POST /internal/v1/support-program-analyses/analyze
 POST /internal/v1/assistant/answers
 POST /internal/v1/assistant/agent
 ```
@@ -155,6 +156,34 @@ ANSWERED는 비어 있지 않은 answer와 빈 updates, null 질문을 반환합
 `HTTP API → SupportProgramConversationService → SupportProgramConversationAgent → OpenAI → 코드·조건 패치 검증 → 서버 안내문 → Response`로
 한 번의 typed structured 호출만 실행합니다. 기존 client/model, store=false, tracing 비활성을 공유하며
 이 역할의 모델·HTTP 25초/전체 실행 30초 제한과 최대 출력 2,000 tokens를 유지합니다.
+
+## 공고별 구조화 추출
+
+`POST /internal/v1/support-program-analyses/analyze`는 `govbiz-support-program-analysis-v2` 계약입니다.
+Core 백그라운드 작업이 한 공고의 `sourceCode`(1~64자), `sourceProgramId`(1~255자), `title`(1~500자),
+`organization`(0~255자), `summary`(0~20,000자), `targetDescription`(0~8,000자), `applicationPeriod`(0~1,000자),
+nullable `applicationMethod`(0~8,000자)와 `detailText`(0~30,000자, Core가 미리 자름), 첨부 공고문 본문
+`attachments`(기본 빈 배열, 최대 8개, 각 `name` 1~255자·`text` 1~40,000자, 모든 `text` 합계 40,000자 이하, Core가 미리 자름)를 보냅니다.
+길이 초과·필드 누락·추가 필드는 모델 호출 없이 422입니다.
+
+응답은 `analysisVersion`, `model`, `summaryLine`(80자 이내, 근거 없음), `supportTypes`(GRANT·LOAN·GUARANTEE·
+VOUCHER·CONSULTING·EDUCATION·SPACE·MARKETING·RND·EXPORT·HR·OTHER 중복 제거), `supportAmount`(`text`,
+수혜자당 최대 금액 `maxAmountKrw`), `selectionScale`, `conditions`(최대 20개, `kind` REQUIRED·EXCLUDED·PREFERRED,
+`category`, `text`, `values`), `contact`, `requiredDocuments`(최대 30개, `name`, `requirement` REQUIRED·OPTIONAL·CONDITIONAL, `note`),
+`selectionSteps`(최대 10개, 원문 순서, `name`, `note`), `evaluationCriteria`(최대 20개, `item`, 배점 `points` 0~1000 또는 null),
+`schedule`(최대 15개, `label`, `date` YYYY-MM-DD 또는 null, `text`), `discardedItemCount`입니다. null·빈 배열은 원문에 명시 없음을 뜻합니다.
+summaryLine·supportTypes를 제외한 각 항목은 `evidence`(`field`: SUMMARY·TARGET_DESCRIPTION·APPLICATION_METHOD·DETAIL_TEXT·ATTACHMENT,
+`quote` 1~300자, `attachmentName`)를 가집니다. 모델은 첨부 근거를 `attachmentIndex`(ATTACHMENT일 때만 필수, 그 밖은 null)로 반환하고
+서버가 해당 첨부 이름으로 바꿉니다. Agent는 모델 출력 뒤 quote가 지정 필드(null 불가, ATTACHMENT는 유효한 번호의 첨부 text)의 정확한
+부분 문자열인지, `values`가 분류 규칙(regions는 REGION의 17개 시·도 약칭 또는 전국 단독, 업력 연수는 BUSINESS_AGE, 만 나이는
+FOUNDER_AGE, 그 밖은 모두 null, 최소 ≤ 최대)을 지키는지, 일정 `date`가 실제 달력 날짜인지, 근거를 제외한 값이 공백 정규화 후 같은
+중복 항목인지 검사합니다. 확인할 수 없는 항목은 제외하고 그 개수를 `discardedItemCount`로 반환하며 로그에는 개수만 남깁니다.
+모델 호출 실패·거절·JSON/스키마 불일치는 503, 시간 초과는 504이며 정상 응답으로 대신하는 fallback은 없습니다.
+
+`HTTP API → SupportProgramAnalysisAgent → OpenAI → 근거·값 검증 → Response`로 한 번의 strict structured 호출만 실행합니다.
+공통 `OPENAI_MODEL`, store=false, 추론 none, 재시도 없음, 최대 출력 12,000 tokens를 사용하고 Langfuse에는 본문 없이
+`analysis.model` generation만 남깁니다. 첨부까지 포함한 긴 원문을 위해 모델·HTTP `90s` < 전체 Agent `100s`의 별도 제한을 사용합니다.
+무료 스텁 테스트는 계약·검증 규칙 확인이며 실제 추출 정확도 측정이 아닙니다.
 
 ## 도우미 자유 질문 분류 (C2)
 
@@ -792,6 +821,8 @@ LLM_COMBINATION_REVIEW_MODEL_TIMEOUT_SECONDS=60.0
 LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS=70.0
 LLM_RANKING_MODEL_TIMEOUT_SECONDS=45.0
 LLM_RANKING_RUN_TIMEOUT_SECONDS=50.0
+LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS=90.0
+LLM_ANALYSIS_RUN_TIMEOUT_SECONDS=100.0
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=
 QDRANT_TIMEOUT_SECONDS=5
@@ -845,6 +876,8 @@ Ops의 저장 캡처 재계산도 원래 모델명을 표시하며 새 모델의
 Core 전용 읽기 `75s`를 사용합니다. 두 `LLM_COMBINATION_REVIEW_*` 값은 유한한 0초 초과·120초 이하이며
 모델 제한이 전체 제한보다 작아야 합니다. timeout은 내부 HTTP 504 `COMBINATION_REVIEW_TIMEOUT`과
 민감한 원문·오류 메시지를 제외한 `failure_kind`, 오류 클래스, 사업·근거 수, `elapsed_ms` 로그로 구분합니다.
+공고별 구조화 추출은 모델·HTTP `90s` < 전체 Agent `100s`를 기본으로 사용합니다. 두 `LLM_ANALYSIS_*` 값은 유한한
+0초 초과·120초 이하이며 모델 제한이 전체 제한보다 작아야 하고, 잘못된 값은 기동 오류입니다. Core 호출 읽기 제한은 전체 제한보다 길게 맞춥니다.
 조건 해석·원문 근거 답변은 기존 모델·HTTP `25s`, 전체 Agent `30s`, Core 읽기 `35s`를 유지합니다.
 기존 비순위화 timeout 환경변수는 0초 초과·30초 이하 이외의 값에 기존 기본값 대체 정책을 유지합니다.
 시간 제한 분리에서는 모델·후보 20개·출력 상한 10,000 tokens·프롬프트·자격 검증을 변경하지 않았습니다.

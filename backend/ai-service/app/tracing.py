@@ -59,6 +59,7 @@ SPAN_NAMES = {
     "search.ranking",
     "search.ranking.model",
     "search.selection",
+    "analysis.model",
 }
 
 
@@ -153,6 +154,8 @@ class LLMTracing:
                 get_current_span().set_attribute("langfuse.trace.name", "support-program-search")
             elif name.startswith("assistant."):
                 get_current_span().set_attribute("langfuse.trace.name", "assistant-agent")
+            elif name.startswith("analysis."):
+                get_current_span().set_attribute("langfuse.trace.name", "support-program-analysis")
         except Exception:
             logger.error("evidence_trace_start_failed")
             yield None

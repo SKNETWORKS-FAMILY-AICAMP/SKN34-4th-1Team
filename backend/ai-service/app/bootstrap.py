@@ -15,6 +15,7 @@ from app.assistant_agent.retriever import QdrantEvidenceRetriever
 from app.assistant_agent.service import AssistantAgentService
 from app.assistant_agent.tools import CoreToolClient
 
+from app.support_program_analysis.agent import SupportProgramAnalysisAgent
 from app.support_program_evidence.agent import SupportProgramEvidenceAnswerAgent
 from app.support_program_evidence.answer_service import SupportProgramEvidenceAnswerService
 from app.support_program_evidence.service import SupportProgramEvidenceService
@@ -37,6 +38,7 @@ class ApplicationContainer:
     support_program_evidence_service: SupportProgramEvidenceService | None = None
     support_program_evidence_answer_service: SupportProgramEvidenceAnswerService | None = None
     support_program_conversation_service: SupportProgramConversationService | None = None
+    support_program_analysis_agent: SupportProgramAnalysisAgent | None = None
     qdrant_client: AsyncQdrantClient | None = None
     combination_review_service: CombinationReviewService | None = None
     application_preparation_service: ApplicationPreparationService | None = None
@@ -68,6 +70,7 @@ def build_application_container(
     support_program_recommendation_agent: SupportProgramRecommendationAgent | None = None,
     support_program_evidence_answer_agent: SupportProgramEvidenceAnswerAgent | None = None,
     support_program_conversation_agent: SupportProgramConversationAgent | None = None,
+    support_program_analysis_agent: SupportProgramAnalysisAgent | None = None,
     application_preparation_agent: ApplicationPreparationAgent | None = None,
     assistant_agent: AssistantAgent | None = None,
     assistant_agent_service: AssistantAgentService | None = None,
@@ -120,6 +123,18 @@ def build_application_container(
             model=general_model,
             model_timeout_seconds=settings.llm_model_timeout_seconds,
             run_timeout_seconds=settings.llm_run_timeout_seconds,
+        )
+
+    if support_program_analysis_agent is None:
+        # 공고별 구조화 추출은 공통 모델을 쓰고, 긴 원문을 위해 별도 제한 시간만 둔다.
+        support_program_analysis_agent = SupportProgramAnalysisAgent(
+            tracing=llm_tracing,
+            model=ChatOpenAI(
+                model=settings.openai_model, api_key=settings.openai_api_key, use_responses_api=True, max_retries=0,
+                root_async_client=openai_client, async_client=openai_client.chat.completions,
+            ),
+            model_timeout_seconds=settings.llm_analysis_model_timeout_seconds,
+            run_timeout_seconds=settings.llm_analysis_run_timeout_seconds,
         )
 
     if application_preparation_agent is None:
@@ -202,6 +217,7 @@ def build_application_container(
         application_preparation_service=ApplicationPreparationService(application_preparation_agent, settings.openai_model),
         support_program_ranking_service=SupportProgramRankingService(ranking_agent, tracing=llm_tracing),
         support_program_conversation_service=SupportProgramConversationService(conversation_agent),
+        support_program_analysis_agent=support_program_analysis_agent,
         assistant_service=AssistantService(assistant_agent),
         assistant_agent_service=assistant_agent_service,
         assistant_tool_client=assistant_tool_client,

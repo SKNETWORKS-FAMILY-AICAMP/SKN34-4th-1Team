@@ -12,6 +12,8 @@ from app.assistant_agent.router import router as assistant_agent_router
 from app.assistant_agent.service import AssistantAgentService
 
 from app.health.router import router as health_router
+from app.support_program_analysis.agent import SupportProgramAnalysisAgent
+from app.support_program_analysis.router import router as support_program_analysis_router
 from app.support_program_evidence.agent import SupportProgramEvidenceAnswerAgent
 from app.support_program_evidence.router import router as support_program_evidence_router
 from app.support_program_ranking.agent import SupportProgramRecommendationAgent
@@ -29,6 +31,7 @@ def create_app(
     support_program_recommendation_agent: SupportProgramRecommendationAgent | None = None,
     support_program_evidence_answer_agent: SupportProgramEvidenceAnswerAgent | None = None,
     support_program_conversation_agent: SupportProgramConversationAgent | None = None,
+    support_program_analysis_agent: SupportProgramAnalysisAgent | None = None,
     application_preparation_agent: ApplicationPreparationAgent | None = None,
     assistant_agent: AssistantAgent | None = None,
     assistant_agent_service: AssistantAgentService | None = None,
@@ -39,6 +42,7 @@ def create_app(
         support_program_recommendation_agent=support_program_recommendation_agent,
         support_program_evidence_answer_agent=support_program_evidence_answer_agent,
         support_program_conversation_agent=support_program_conversation_agent,
+        support_program_analysis_agent=support_program_analysis_agent,
         application_preparation_agent=application_preparation_agent,
         assistant_agent=assistant_agent,
         assistant_agent_service=assistant_agent_service,
@@ -74,6 +78,7 @@ def create_app(
     application.include_router(support_program_index_router)
     application.include_router(support_program_evidence_router)
     application.include_router(support_program_conversation_router)
+    application.include_router(support_program_analysis_router)
     application.include_router(assistant_router)
     application.include_router(assistant_agent_router)
     return application

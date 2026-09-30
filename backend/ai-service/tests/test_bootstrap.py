@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 import app.bootstrap as bootstrap_module
 import app.main as main_module
+from app.support_program_analysis.agent import SupportProgramAnalysisAgent
 from app.support_program_ranking.agent import SupportProgramRecommendationAgent
 from app.support_program_ranking.models import (
     SCORING_VERSION,
@@ -150,6 +151,27 @@ async def test_ranking_model_and_reasoning_do_not_change_conversation_or_evidenc
     finally:
         await container.close()
     assert client.closed
+
+
+@pytest.mark.anyio
+async def test_support_program_analysis_agent_uses_shared_client_and_its_own_timeouts(monkeypatch):
+    client = FakeOpenAIClient()
+    monkeypatch.setattr(bootstrap_module, "AsyncOpenAI", lambda **kwargs: client)
+    monkeypatch.setattr(bootstrap_module, "OpenAIResponsesModel", lambda **kwargs: ScriptedModel([]))
+    container = build_application_container(OPENAI_SETTINGS)
+    try:
+        agent = container.support_program_analysis_agent
+        assert isinstance(agent, SupportProgramAnalysisAgent)
+        assert agent._tracing is container.llm_tracing
+        assert (agent._model_timeout_seconds, agent._run_timeout_seconds) == (90, 100)
+        assert agent._model.bound.model_name == "test-model"
+        assert agent._model.bound.root_async_client is client
+        assert agent._model.bound.max_retries == 0 and agent._model.bound.use_responses_api is True
+        assert agent._model.kwargs == {
+            "max_tokens": 12_000, "store": False, "reasoning": {"effort": "none"}, "timeout": 90,
+        }
+    finally:
+        await container.close()
 
 
 def test_application_lifespan_closes_container_owned_client(

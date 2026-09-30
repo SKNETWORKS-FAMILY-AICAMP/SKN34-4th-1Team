@@ -23,7 +23,10 @@ DEFAULT_LLM_RANKING_MODEL_TIMEOUT_SECONDS = 45.0
 DEFAULT_LLM_RANKING_RUN_TIMEOUT_SECONDS = 50.0
 DEFAULT_LLM_COMBINATION_REVIEW_MODEL_TIMEOUT_SECONDS = 60.0
 DEFAULT_LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS = 70.0
+DEFAULT_LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS = 90.0
+DEFAULT_LLM_ANALYSIS_RUN_TIMEOUT_SECONDS = 100.0
 MAX_LLM_RANKING_TIMEOUT_SECONDS = 60.0
+MAX_LLM_ANALYSIS_TIMEOUT_SECONDS = 120.0
 MAX_LLM_COMBINATION_REVIEW_TIMEOUT_SECONDS = 120.0
 
 
@@ -87,6 +90,8 @@ class Settings:
     llm_ranking_run_timeout_seconds: float = DEFAULT_LLM_RANKING_RUN_TIMEOUT_SECONDS
     llm_combination_review_model_timeout_seconds: float = DEFAULT_LLM_COMBINATION_REVIEW_MODEL_TIMEOUT_SECONDS
     llm_combination_review_run_timeout_seconds: float = DEFAULT_LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS
+    llm_analysis_model_timeout_seconds: float = DEFAULT_LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS
+    llm_analysis_run_timeout_seconds: float = DEFAULT_LLM_ANALYSIS_RUN_TIMEOUT_SECONDS
     openai_ranking_model: str | None = None
     openai_ranking_reasoning_effort: Literal["none", "low"] = "none"
     openai_ranking_service_tier: Literal["default", "priority"] = "default"
@@ -143,6 +148,16 @@ class Settings:
         if self.llm_combination_review_model_timeout_seconds >= self.llm_combination_review_run_timeout_seconds:
             raise SettingsConfigurationError(
                 "LLM_COMBINATION_REVIEW_MODEL_TIMEOUT_SECONDS must be less than LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS"
+            )
+        for name, value in (
+            ("LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS", self.llm_analysis_model_timeout_seconds),
+            ("LLM_ANALYSIS_RUN_TIMEOUT_SECONDS", self.llm_analysis_run_timeout_seconds),
+        ):
+            if isinstance(value, bool) or not isfinite(value) or not 0 < value <= MAX_LLM_ANALYSIS_TIMEOUT_SECONDS:
+                raise SettingsConfigurationError(f"{name} must be finite and greater than 0, up to 120 seconds")
+        if self.llm_analysis_model_timeout_seconds >= self.llm_analysis_run_timeout_seconds:
+            raise SettingsConfigurationError(
+                "LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS must be less than LLM_ANALYSIS_RUN_TIMEOUT_SECONDS"
             )
 
     @classmethod
@@ -207,6 +222,12 @@ class Settings:
             llm_combination_review_run_timeout_seconds=_strict_timeout(
                 "LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS",
                 DEFAULT_LLM_COMBINATION_REVIEW_RUN_TIMEOUT_SECONDS,
+            ),
+            llm_analysis_model_timeout_seconds=_strict_timeout(
+                "LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS", DEFAULT_LLM_ANALYSIS_MODEL_TIMEOUT_SECONDS,
+            ),
+            llm_analysis_run_timeout_seconds=_strict_timeout(
+                "LLM_ANALYSIS_RUN_TIMEOUT_SECONDS", DEFAULT_LLM_ANALYSIS_RUN_TIMEOUT_SECONDS,
             ),
             application_form_discovery_model_timeout_seconds=_strict_timeout("APPLICATION_FORM_DISCOVERY_MODEL_TIMEOUT_SECONDS", 210.0),
             application_form_discovery_run_timeout_seconds=_strict_timeout("APPLICATION_FORM_DISCOVERY_RUN_TIMEOUT_SECONDS", 240.0),
