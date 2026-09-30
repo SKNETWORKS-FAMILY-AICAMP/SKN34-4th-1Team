@@ -27,8 +27,11 @@ export function useSupportProgramConditionCheckViewModel(
   const [state, setState] = useState<SupportProgramConditionCheckState>({ status: 'idle' })
 
   useEffect(() => {
+    // 판정하지 않는 공고(비로그인·분석 전)는 이미 idle이면 상태를 다시 쓰지 않아 상세 화면을 한 번 더 그리지 않습니다.
+    const idle = (current: SupportProgramConditionCheckState): SupportProgramConditionCheckState =>
+      current.status === 'idle' ? current : { status: 'idle' }
     if (!enabled || analyzedAt === null) {
-      setState({ status: 'idle' })
+      setState(idle)
       return
     }
     const controller = new AbortController()
@@ -36,7 +39,7 @@ export function useSupportProgramConditionCheckViewModel(
     useCase.execute({ sourceCode, sourceProgramId }, controller.signal)
       .then((check) => {
         if (controller.signal.aborted) return
-        if (!check || (check.status === 'CHECKED' && check.analyzedAt !== analyzedAt)) setState({ status: 'idle' })
+        if (!check || (check.status === 'CHECKED' && check.analyzedAt !== analyzedAt)) setState(idle)
         else setState({ status: 'ready', check })
       })
       .catch(() => { if (!controller.signal.aborted) setState({ status: 'failed' }) })
