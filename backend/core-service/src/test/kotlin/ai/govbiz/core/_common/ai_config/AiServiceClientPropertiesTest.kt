@@ -215,6 +215,15 @@ class AiServiceClientPropertiesTest {
         assertEquals(READ_TIMEOUT, properties.readTimeout)
     }
 
+    @Test fun supportProgramAnalysisWaitsLongerThanTheAiServiceRunLimit() {
+        val properties = AiServiceClientProperties(URI.create("http://ai.test"), CONNECT_TIMEOUT, READ_TIMEOUT)
+        assertEquals(Duration.ofSeconds(120), properties.supportProgramAnalysisReadTimeout)
+        assertThrows(IllegalArgumentException::class.java) {
+            AiServiceClientProperties(URI.create("http://ai.test"), CONNECT_TIMEOUT, READ_TIMEOUT,
+                supportProgramAnalysisReadTimeout = Duration.ZERO)
+        }
+    }
+
     private fun assertConstructorRejectsNull(
         baseUrl: URI?,
         connectTimeout: Duration?,
@@ -231,11 +240,12 @@ class AiServiceClientPropertiesTest {
             Duration::class.java,
             Duration::class.java,
             Duration::class.java,
+            Duration::class.java,
         )
         val exception = assertThrows(InvocationTargetException::class.java) {
             constructor.newInstance(
                 baseUrl, connectTimeout, readTimeout, Duration.ofSeconds(30), rankingReadTimeout,
-                combinationReviewReadTimeout, Duration.ofSeconds(270), Duration.ofSeconds(1800),
+                combinationReviewReadTimeout, Duration.ofSeconds(270), Duration.ofSeconds(1800), Duration.ofSeconds(120),
             )
         }
         assertInstanceOf(

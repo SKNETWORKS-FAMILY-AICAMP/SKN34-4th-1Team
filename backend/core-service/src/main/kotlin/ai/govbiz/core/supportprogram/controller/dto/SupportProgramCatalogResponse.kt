@@ -17,7 +17,7 @@ data class SupportProgramCatalogResponse(
     companion object {
         fun from(result: SupportProgramCatalogResult): SupportProgramCatalogResponse =
             SupportProgramCatalogResponse(
-                programs = result.programs.map(SupportProgramResponse::from),
+                programs = result.programs.map { SupportProgramResponse.from(it, result.analysisSummaries[it.sourceQualifiedId]) },
                 total = result.total,
                 page = result.page,
                 pageSize = result.pageSize,

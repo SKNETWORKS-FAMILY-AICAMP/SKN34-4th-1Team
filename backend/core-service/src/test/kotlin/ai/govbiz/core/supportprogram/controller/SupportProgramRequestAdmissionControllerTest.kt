@@ -15,6 +15,7 @@ import ai.govbiz.core.supportprogram.service.evidence.exception.SupportProgramEv
 import ai.govbiz.core.supportprogram.service.readiness.SupportProgramSearchReadinessService
 import ai.govbiz.core.supportprogram.service.search.SupportProgramSearchPreviewService
 import ai.govbiz.core.supportprogram.service.search.SupportProgramSearchService
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramSearchResultRepository
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -50,7 +51,7 @@ class SupportProgramRequestAdmissionControllerTest {
             now::get,
         )
         return MockMvcBuilders.standaloneSetup(
-            SupportProgramController(SupportProgramSearchPreviewService(search, Mockito.mock(SupportProgramSearchResultRepository::class.java)), readiness, detail, evidence, admission),
+            SupportProgramController(SupportProgramSearchPreviewService(search, Mockito.mock(SupportProgramSearchResultRepository::class.java), Mockito.mock(SupportProgramAnalysisRepository::class.java)), readiness, detail, evidence, admission),
         ).setCustomArgumentResolvers(AuthenticatedAccountArgumentResolver { Mockito.mock(AccountSessionService::class.java) })
             .setControllerAdvice(ApiExceptionHandler()).build()
     }
@@ -168,13 +169,13 @@ class SupportProgramRequestAdmissionControllerTest {
             SupportProgramSearchReadinessResult(SupportProgramSearchState.PREPARING, 0, false, null, null, emptyList()),
         )
         Mockito.doThrow(ai.govbiz.core.supportprogram.service.detail.exception.SupportProgramNotFoundException())
-            .`when`(detail).get("BIZINFO", "PBLN_TEST")
+            .`when`(detail).getDetail("BIZINFO", "PBLN_TEST")
         mvc.perform(searchRequest()).andExpect(status().isOk())
         mvc.perform(get("/api/v1/support-programs/readiness")).andExpect(status().isOk())
         mvc.perform(get("/api/v1/support-programs/detail").param("sourceCode", "BIZINFO")
             .param("sourceProgramId", "PBLN_TEST")).andExpect(status().isNotFound())
         Mockito.verify(readiness).get()
-        Mockito.verify(detail).get("BIZINFO", "PBLN_TEST")
+        Mockito.verify(detail).getDetail("BIZINFO", "PBLN_TEST")
     }
 
     @Test

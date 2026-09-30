@@ -3,6 +3,7 @@ package ai.govbiz.core.supportprogram.service.catalog
 import ai.govbiz.core.supportprogram.domain.CatalogSupportProgram
 import ai.govbiz.core.supportprogram.domain.SupportProgramCatalogSort
 import ai.govbiz.core.supportprogram.domain.SupportProgramStatus
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramRepository
 import ai.govbiz.core.supportprogram.service.catalog.exception.SupportProgramCatalogFilterException
 import ai.govbiz.core.supportprogram.service.dto.SupportProgramCatalogResult
@@ -12,10 +13,14 @@ import org.springframework.stereotype.Service
 internal fun splitFilterValues(raw: String): Set<String> =
     raw.split(',').map(String::trim).filter(String::isNotEmpty).toSet()
 
-/** 공개된 DB 공고를 명시적인 조건으로 조회하며 AI 검색이나 자격 판정을 실행하지 않습니다. */
+/**
+ * 공개된 DB 공고를 명시적인 조건으로 조회하며 AI 검색이나 자격 판정을 실행하지 않습니다.
+ * 카드용 분석 요약은 페이지를 자른 뒤 그 페이지 공고만 한 번에 읽습니다.
+ */
 @Service
 class SupportProgramCatalogService(
     private val repository: SupportProgramRepository,
+    private val analysisRepository: SupportProgramAnalysisRepository,
 ) {
     fun browse(
         rawKeyword: String = "",
@@ -85,6 +90,7 @@ class SupportProgramCatalogService(
             startupStages = startupDetails.flatMap { it.startupStages }.filter(String::isNotBlank).distinct().sorted(),
             applicantTypes = startupDetails.flatMap { it.applicantTypes }.filter(String::isNotBlank).distinct().sorted(),
             founderAges = startupDetails.flatMap { it.founderAges }.filter(String::isNotBlank).distinct().sorted(),
+            analysisSummaries = analysisRepository.findCurrentSummaries(programs),
         )
     }
 }

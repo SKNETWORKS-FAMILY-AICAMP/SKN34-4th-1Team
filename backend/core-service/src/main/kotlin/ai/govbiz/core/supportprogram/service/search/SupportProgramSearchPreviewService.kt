@@ -5,6 +5,7 @@ import ai.govbiz.core.supportprogram.domain.SupportProgramCompanyConditions
 import ai.govbiz.core.supportprogram.domain.SupportProgramConversationContext
 import ai.govbiz.core.supportprogram.domain.SupportProgramSearchSnapshot
 import ai.govbiz.core.supportprogram.facade.SupportProgramRankingFacade
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramSearchResultRepository
 import ai.govbiz.core.supportprogram.service.dto.SupportProgramSearchPreviewResult
 import ai.govbiz.core.supportprogram.service.dto.SupportProgramSearchRestoredResult
@@ -12,11 +13,15 @@ import ai.govbiz.core.supportprogram.service.search.exception.SupportProgramSear
 import java.util.UUID
 import org.springframework.stereotype.Service
 
-/** 공개 검색은 익명에게 두 건만 제공하고, 로그인 후 같은 검색 결과를 모델 재호출 없이 복원합니다. */
+/**
+ * 공개 검색은 익명에게 두 건만 제공하고, 로그인 후 같은 검색 결과를 모델 재호출 없이 복원합니다.
+ * 카드용 분석 요약은 순위가 정해진 뒤 응답에 싣는 공고만 한 번에 읽고, Redis 스냅샷에는 넣지 않아 복원 때 현재 분석을 다시 읽습니다.
+ */
 @Service
 class SupportProgramSearchPreviewService(
     private val searchService: SupportProgramSearchService,
     private val resultRepository: SupportProgramSearchResultRepository,
+    private val analysisRepository: SupportProgramAnalysisRepository,
 ) {
     fun search(
         query: String,
@@ -27,23 +32,29 @@ class SupportProgramSearchPreviewService(
         val searched = searchService.search(query, acceptingOnly, companyConditions)
         val programs = java.util.List.copyOf(searched.programs.take(SupportProgramRankingFacade.MAX_RESULTS).map(::copyProgram))
         val full = SupportProgramSearchPreviewResult(searched.query, programs, programs.size)
-        if (accountId != null || programs.size <= GUEST_RESULT_LIMIT) return full
+        if (accountId != null || programs.size <= GUEST_RESULT_LIMIT) return withAnalysisSummaries(full)
 
         val context = SupportProgramConversationContext(
             searched.query.takeIf(String::isNotBlank), acceptingOnly, companyConditions ?: SupportProgramCompanyConditions(),
         )
         val token = UUID.randomUUID().toString()
         val expiresAt = resultRepository.save(token, SupportProgramSearchSnapshot(full.query, programs, context))
-        return full.copy(programs = java.util.List.copyOf(programs.take(GUEST_RESULT_LIMIT)), resultToken = token, expiresAt = expiresAt)
+        return withAnalysisSummaries(
+            full.copy(programs = java.util.List.copyOf(programs.take(GUEST_RESULT_LIMIT)), resultToken = token, expiresAt = expiresAt),
+        )
     }
 
     fun restore(resultToken: String, accountId: Long): SupportProgramSearchRestoredResult {
         val saved = resultRepository.claim(resultToken, accountId) ?: throw SupportProgramSearchResultExpiredException()
         val programs = java.util.List.copyOf(saved.programs.map(::copyProgram))
         return SupportProgramSearchRestoredResult(
-            SupportProgramSearchPreviewResult(saved.query, programs, programs.size), saved.context,
+            withAnalysisSummaries(SupportProgramSearchPreviewResult(saved.query, programs, programs.size)), saved.context,
         )
     }
+
+    /** 응답에 실제로 싣는 공고만 조회해 익명 미리보기에서 숨긴 공고의 분석은 읽지도 내보내지도 않습니다. */
+    private fun withAnalysisSummaries(result: SupportProgramSearchPreviewResult): SupportProgramSearchPreviewResult =
+        result.copy(analysisSummaries = analysisRepository.findCurrentSummaries(result.programs))
 
     /** 내부의 목록까지 고정해 검색 호출자가 가진 컬렉션 변경이 로그인 후 결과에 섞이지 않게 합니다. */
     private fun copyProgram(program: SupportProgram): SupportProgram = program.copy(

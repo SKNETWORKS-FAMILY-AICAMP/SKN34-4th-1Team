@@ -1,5 +1,6 @@
 package ai.govbiz.core.supportprogram.service.catalog
 
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramRepository
 import ai.govbiz.core.supportprogram.service.catalog.exception.SupportProgramCatalogFilterException
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -10,12 +11,13 @@ class SupportProgramCatalogFilterValidationTest {
     @Test
     fun rejectsStartupFiltersWithoutTheirSourceBeforeReadingTheDatabase() {
         val repository = Mockito.mock(SupportProgramRepository::class.java)
-        val service = SupportProgramCatalogService(repository)
+        val analysisRepository = Mockito.mock(SupportProgramAnalysisRepository::class.java)
+        val service = SupportProgramCatalogService(repository, analysisRepository)
         for (source in listOf("", "BIZINFO", "UNKNOWN")) {
             assertThrows(SupportProgramCatalogFilterException::class.java) { service.browse(sourceCode = source, rawStartupStage = "3년미만") }
             assertThrows(SupportProgramCatalogFilterException::class.java) { service.browse(sourceCode = source, rawApplicantType = "일반기업") }
             assertThrows(SupportProgramCatalogFilterException::class.java) { service.browse(sourceCode = source, rawFounderAge = "만 40세 이상") }
         }
-        Mockito.verifyNoInteractions(repository)
+        Mockito.verifyNoInteractions(repository, analysisRepository)
     }
 }

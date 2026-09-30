@@ -2,6 +2,8 @@ package ai.govbiz.core.supportprogram.controller
 
 import ai.govbiz.core._common.exception.ApiExceptionHandler
 import ai.govbiz.core.supportprogram.domain.SupportProgram
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSummary
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSupportType
 import ai.govbiz.core.supportprogram.domain.SupportProgramCatalogSort
 import ai.govbiz.core.supportprogram.domain.SupportProgramStatus
 import ai.govbiz.core.supportprogram.service.catalog.SupportProgramCatalogService
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.http.MediaType
+import org.springframework.test.json.JsonCompareMode
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -40,6 +43,7 @@ class SupportProgramCatalogControllerTest {
             .andExpect(jsonPath("$.programs[0].matchedReasons").isEmpty())
             .andExpect(jsonPath("$.programs[0].recommendationScore").isEmpty())
             .andExpect(jsonPath("$.programs[0].eligibilityReview").isEmpty())
+            .andExpect(jsonPath("$.programs[0].analysisSummary").isEmpty())
             .andExpect(jsonPath("$.total").value(1))
             .andExpect(jsonPath("$.page").value(1))
             .andExpect(jsonPath("$.pageSize").value(12))
@@ -126,6 +130,53 @@ class SupportProgramCatalogControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.programs").isEmpty())
         Mockito.verify(service).browse(keyword, region, category, SupportProgramStatus.OPEN, SupportProgramCatalogSort.RECENT, 1_000_000, 50)
         Mockito.verifyNoMoreInteractions(service)
+    }
+
+    @Test
+    fun serializesTheCardAnalysisSummaryOnlyForProgramsWithACurrentCompletedAnalysis() {
+        val analyzed = result().programs.single()
+        val plain = analyzed.copy(id = "공고-2", sourceCode = "KSTARTUP", sourceUrl = "https://www.k-startup.go.kr/")
+        Mockito.`when`(service.browse()).thenReturn(result().copy(
+            programs = listOf(analyzed, plain),
+            analysisSummaries = mapOf(
+                "BIZINFO:공고-1" to SupportProgramAnalysisSummary(
+                    "서울 수출기업에 최대 5천만원을 지원합니다.", "최대 5천만원", 50_000_000,
+                    listOf(SupportProgramAnalysisSupportType.GRANT, SupportProgramAnalysisSupportType.EXPORT),
+                ),
+                // 같은 원본 ID라도 제공처가 다르면 다른 공고입니다.
+                "BIZINFO:공고-2" to SupportProgramAnalysisSummary(null, null, null, emptyList()),
+            ),
+        ))
+
+        mvc.perform(get(URL)).andExpect(status().isOk())
+            .andExpect(content().json("""
+                {
+                  "programs": [
+                    {
+                      "id": "공고-1", "sourceCode": "BIZINFO", "title": "수출 지원사업", "organization": "서울시",
+                      "summary": "공식 API 본문", "categories": ["수출"], "regions": ["서울"], "targetDescription": "중소기업",
+                      "applicationPeriod": "상시 접수", "applicationStartDate": null, "applicationEndDate": null, "status": "OPEN",
+                      "sourceName": "기업마당", "sourceUrl": "https://www.bizinfo.go.kr/", "matchedReasons": [],
+                      "recommendationScore": null, "eligibilityReview": null,
+                      "analysisSummary": {
+                        "summaryLine": "서울 수출기업에 최대 5천만원을 지원합니다.",
+                        "supportAmountText": "최대 5천만원",
+                        "maxAmountKrw": 50000000,
+                        "supportTypes": ["GRANT", "EXPORT"]
+                      }
+                    },
+                    {
+                      "id": "공고-2", "sourceCode": "KSTARTUP", "title": "수출 지원사업", "organization": "서울시",
+                      "summary": "공식 API 본문", "categories": ["수출"], "regions": ["서울"], "targetDescription": "중소기업",
+                      "applicationPeriod": "상시 접수", "applicationStartDate": null, "applicationEndDate": null, "status": "OPEN",
+                      "sourceName": "기업마당", "sourceUrl": "https://www.k-startup.go.kr/", "matchedReasons": [],
+                      "recommendationScore": null, "eligibilityReview": null, "analysisSummary": null
+                    }
+                  ],
+                  "total": 1, "page": 1, "pageSize": 12, "totalPages": 1, "regions": ["서울"], "categories": ["수출"],
+                  "startupStages": [], "applicantTypes": [], "founderAges": []
+                }
+            """.trimIndent(), JsonCompareMode.STRICT))
     }
 
     private fun result() = SupportProgramCatalogResult(

@@ -56,6 +56,15 @@ class SupportProgramEvidenceService(
         return chunksFor(currentSourceDocument(program))
     }
 
+    /**
+     * 저장된 원문이 최신이면 재사용하고 아니면 다시 수집한 기업마당 공식 원문입니다. 공고 분석 Worker가 씁니다.
+     * 기업마당 공고가 아니면 [SupportProgramEvidenceNotSupportedException], 수집 실패는 [SupportProgramEvidenceUnavailableException]입니다.
+     */
+    fun sourceDocument(program: SupportProgram): SupportProgramSourceDocument {
+        if (program.sourceCode != BIZINFO_SOURCE_CODE) throw SupportProgramEvidenceNotSupportedException()
+        return currentSourceDocument(program)
+    }
+
     private fun currentSourceDocument(program: SupportProgram): SupportProgramSourceDocument {
         val cached = try {
             repository.findPresentSourceDocument(program.sourceCode, program.id)

@@ -48,6 +48,17 @@ class AiServiceClientConfig {
     )
 
     @Bean
+    fun aiSupportProgramAnalysisRestClient(
+        restClientBuilder: RestClient.Builder,
+        properties: AiServiceClientProperties,
+    ): RestClient = buildRestClient(
+        restClientBuilder,
+        properties.baseUrl,
+        properties.connectTimeout,
+        properties.supportProgramAnalysisReadTimeout,
+    )
+
+    @Bean
     fun aiServiceRestClient(
         restClientBuilder: RestClient.Builder,
         properties: AiServiceClientProperties,

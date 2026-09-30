@@ -2,6 +2,8 @@ package ai.govbiz.core.supportprogram.service.catalog
 
 import ai.govbiz.core.supportprogram.domain.CatalogSupportProgram
 import ai.govbiz.core.supportprogram.domain.SupportProgram
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSummary
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSupportType
 import ai.govbiz.core.supportprogram.domain.SupportProgramCatalogSort
 import ai.govbiz.core.supportprogram.domain.SupportProgramEligibilityAssessment
 import ai.govbiz.core.supportprogram.domain.SupportProgramEligibilityReview
@@ -9,6 +11,7 @@ import ai.govbiz.core.supportprogram.domain.SupportProgramEligibilityReviewStatu
 import ai.govbiz.core.supportprogram.domain.SupportProgramEligibilityStatus
 import ai.govbiz.core.supportprogram.domain.SupportProgramStatus
 import ai.govbiz.core.supportprogram.domain.SupportProgramStartupDetails
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramRepository
 import java.time.LocalDate
 import org.junit.jupiter.api.AfterEach
@@ -20,7 +23,8 @@ import org.mockito.Mockito
 
 class SupportProgramCatalogServiceTest {
     private val repository = Mockito.mock(SupportProgramRepository::class.java)
-    private val service = SupportProgramCatalogService(repository)
+    private val analysisRepository = Mockito.mock(SupportProgramAnalysisRepository::class.java)
+    private val service = SupportProgramCatalogService(repository, analysisRepository)
 
     @AfterEach
     fun onlyReadsThePublishedSnapshot() {
@@ -228,6 +232,24 @@ class SupportProgramCatalogServiceTest {
         Mockito.`when`(repository.findPublishedPresent()).thenThrow(error)
 
         assertSame(error, assertThrows(IllegalStateException::class.java) { service.browse() })
+    }
+
+    @Test
+    fun readsAnalysisSummariesOnlyForTheReturnedPageInOneCall() {
+        snapshot(
+            candidate("newest", timestamp = "2026-09-03"),
+            candidate("middle", timestamp = "2026-09-02", sourceCode = "KSTARTUP"),
+            candidate("oldest", timestamp = "2026-09-01"),
+        )
+        val summary = SupportProgramAnalysisSummary("수출 바우처 지원", "최대 3천만원", 30_000_000, listOf(SupportProgramAnalysisSupportType.VOUCHER))
+        Mockito.`when`(analysisRepository.findCurrentSummaries(Mockito.anyList())).thenReturn(mapOf("KSTARTUP:middle" to summary))
+
+        val result = service.browse(page = 1, pageSize = 2)
+
+        assertEquals(listOf("newest", "middle"), result.programs.map { it.id })
+        assertEquals(mapOf("KSTARTUP:middle" to summary), result.analysisSummaries)
+        Mockito.verify(analysisRepository, Mockito.times(1)).findCurrentSummaries(result.programs)
+        Mockito.verifyNoMoreInteractions(analysisRepository)
     }
 
     private fun snapshot(vararg programs: CatalogSupportProgram) {

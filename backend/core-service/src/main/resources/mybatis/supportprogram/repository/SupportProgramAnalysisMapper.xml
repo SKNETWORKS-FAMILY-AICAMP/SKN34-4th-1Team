@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ai.govbiz.core.supportprogram.repository.mapper.SupportProgramAnalysisMapper">
+
+    <resultMap id="supportProgramAnalysisDbRow"
+               type="ai.govbiz.core.supportprogram.repository.mapper.SupportProgramAnalysisDbRow">
+        <id column="source_code" property="sourceCode" />
+        <id column="source_program_id" property="sourceProgramId" />
+        <result column="program_fingerprint" property="programFingerprint" />
+        <result column="current_program_fingerprint" property="currentProgramFingerprint" />
+        <result column="status" property="status" />
+        <result column="analysis_version" property="analysisVersion" />
+        <result column="model" property="model" />
+        <result column="analysis_json" property="analysisJson" />
+        <result column="failure_code" property="failureCode" />
+        <result column="attempt_count" property="attemptCount" />
+        <result column="next_attempt_at" property="nextAttemptAt" />
+        <result column="last_attempt_at" property="lastAttemptAt" />
+        <result column="lease_token" property="leaseToken" />
+        <result column="lease_until" property="leaseUntil" />
+        <result column="analyzed_at" property="analyzedAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!--
+        분석 입력이 되는 공고 내용의 지문을 정의하는 유일한 위치입니다. 후보 선택·실행권 선점·상세 조회·목록 요약이 함께 씁니다.
+        support_program.content_hash는 Core에서 채우지 않으므로 사용하지 않습니다. 별칭 program이 필요합니다.
+    -->
+    <sql id="programFingerprint">
+        CONVERT(SHA2(CONCAT_WS(CHAR(31 USING utf8mb4),
+            program.title, program.organization, program.summary, program.target_description,
+            program.application_period_raw, COALESCE(program.application_method, ''), program.source_url
+        ), 256) USING ascii) COLLATE ascii_bin
+    </sql>
+
+    <!--
+        실행권이 비어 있고, 공고 내용이 바뀌었거나 미완료·재시도 가능한 실패이거나, 완료 결과의 분석 버전이 Core가 기대하는
+        버전(expectedVersion)과 다른 분석 행입니다. 이전 버전 완료 결과는 첫 재분석(attempt_count = 0) 또는 재시도 시각이
+        지난 경우만 다시 고릅니다. 별칭 analysis·program과 now·maxAttempts·expectedVersion 값이 필요합니다.
+    -->
+    <sql id="claimable">
+        (analysis.lease_until IS NULL OR analysis.lease_until &lt; #{now})
+        AND (
+            analysis.program_fingerprint &lt;&gt; <include refid="programFingerprint" />
+            OR (analysis.status = 'PENDING' AND analysis.attempt_count &lt; #{maxAttempts})
+            OR (analysis.status = 'FAILED' AND analysis.attempt_count &lt; #{maxAttempts}
+                AND analysis.next_attempt_at &lt;= #{now})
+            OR (analysis.status = 'COMPLETED' AND analysis.analysis_version &lt;&gt; #{expectedVersion}
+                AND (analysis.attempt_count = 0
+                    OR (analysis.attempt_count &lt; #{maxAttempts} AND analysis.next_attempt_at &lt;= #{now})))
+        )
+    </sql>
+
+    <sql id="analysisColumns">
+        analysis.source_code,
+        analysis.source_program_id,
+        analysis.program_fingerprint,
+        analysis.status,
+        analysis.analysis_version,
+        analysis.model,
+        analysis.analysis_json,
+        analysis.failure_code,
+        analysis.attempt_count,
+        analysis.next_attempt_at,
+        analysis.last_attempt_at,
+        analysis.lease_token,
+        analysis.lease_until,
+        analysis.analyzed_at,
+        analysis.updated_at
+    </sql>
+
+    <select id="countAttemptedSince" resultType="long">
+        SELECT COUNT(*)
+        FROM support_program_analysis
+        WHERE last_attempt_at &gt;= #{since}
+    </select>
+
+    <select id="findNextCandidate" resultMap="supportProgramAnalysisDbRow">
+        SELECT
+            program.source_code,
+            program.source_program_id,
+            <include refid="programFingerprint" /> AS current_program_fingerprint
+        FROM support_program program
+        LEFT JOIN support_program_analysis analysis
+            ON analysis.source_code = program.source_code
+            AND analysis.source_program_id = program.source_program_id
+        WHERE program.is_source_present = TRUE
+          AND (program.application_end_date IS NULL OR program.application_end_date &gt;= #{today})
+          AND (analysis.source_code IS NULL OR (<include refid="claimable" />))
+        ORDER BY
+            program.application_end_date IS NULL ASC,
+            program.application_end_date ASC,
+            program.source_code ASC,
+            program.source_program_id ASC
+        LIMIT 1
+    </select>
+
+    <insert id="insertPendingIfAbsent"
+            parameterType="ai.govbiz.core.supportprogram.repository.mapper.SupportProgramAnalysisDbRow">
+        INSERT INTO support_program_analysis (
+            source_code,
+            source_program_id,
+            program_fingerprint,
+            status,
+            attempt_count,
+            updated_at
+        ) VALUES (
+            #{sourceCode},
+            #{sourceProgramId},
+            #{programFingerprint},
+            'PENDING',
+            0,
+            #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE source_code = support_program_analysis.source_code
+    </insert>
+
+    <select id="lockClaimable" resultMap="supportProgramAnalysisDbRow">
+        SELECT
+            <include refid="analysisColumns" />,
+            <include refid="programFingerprint" /> AS current_program_fingerprint
+        FROM support_program_analysis analysis
+        INNER JOIN support_program program
+            ON program.source_code = analysis.source_code
+            AND program.source_program_id = analysis.source_program_id
+        WHERE analysis.source_code = #{sourceCode}
+          AND analysis.source_program_id = #{sourceProgramId}
+          AND <include refid="claimable" />
+        FOR UPDATE OF analysis
+    </select>
+
+    <update id="updateClaim"
+            parameterType="ai.govbiz.core.supportprogram.repository.mapper.SupportProgramAnalysisDbRow">
+        UPDATE support_program_analysis
+        SET program_fingerprint = #{programFingerprint},
+            status = #{status},
+            analysis_version = #{analysisVersion,jdbcType=VARCHAR},
+            model = #{model,jdbcType=VARCHAR},
+            analysis_json = #{analysisJson,jdbcType=VARCHAR},
+            failure_code = #{failureCode,jdbcType=VARCHAR},
+            attempt_count = #{attemptCount},
+            next_attempt_at = #{nextAttemptAt,jdbcType=TIMESTAMP},
+            last_attempt_at = #{lastAttemptAt,jdbcType=TIMESTAMP},
+            lease_token = #{leaseToken,jdbcType=VARCHAR},
+            lease_until = #{leaseUntil,jdbcType=TIMESTAMP},
+            analyzed_at = #{analyzedAt,jdbcType=TIMESTAMP},
+            updated_at = #{updatedAt}
+        WHERE source_code = #{sourceCode}
+          AND source_program_id = #{sourceProgramId}
+    </update>
+
+    <update id="completeIfLeased">
+        UPDATE support_program_analysis
+        SET status = 'COMPLETED',
+            analysis_version = #{analysisVersion},
+            model = #{model},
+            analysis_json = #{analysisJson},
+            failure_code = NULL,
+            attempt_count = 0,
+            next_attempt_at = NULL,
+            lease_token = NULL,
+            lease_until = NULL,
+            analyzed_at = #{now},
+            updated_at = #{now}
+        WHERE source_code = #{sourceCode}
+          AND source_program_id = #{sourceProgramId}
+          AND lease_token = #{leaseToken}
+    </update>
+
+    <!-- 이전 버전 완료 결과를 다시 분석하다 실패하면 결과를 지우지 않고 다음 재시도 시각만 기록합니다. -->
+    <update id="deferReanalysisIfLeased">
+        UPDATE support_program_analysis
+        SET next_attempt_at = #{nextAttemptAt,jdbcType=TIMESTAMP},
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = #{now}
+        WHERE source_code = #{sourceCode}
+          AND source_program_id = #{sourceProgramId}
+          AND status = 'COMPLETED'
+          AND lease_token = #{leaseToken}
+    </update>
+
+    <update id="failIfLeased">
+        UPDATE support_program_analysis
+        SET status = 'FAILED',
+            analysis_json = NULL,
+            failure_code = #{failureCode},
+            next_attempt_at = #{nextAttemptAt,jdbcType=TIMESTAMP},
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = #{now}
+        WHERE source_code = #{sourceCode}
+          AND source_program_id = #{sourceProgramId}
+          AND lease_token = #{leaseToken}
+    </update>
+
+    <select id="findWithCurrentFingerprint" resultMap="supportProgramAnalysisDbRow">
+        SELECT
+            <include refid="analysisColumns" />,
+            <include refid="programFingerprint" /> AS current_program_fingerprint
+        FROM support_program_analysis analysis
+        INNER JOIN support_program program
+            ON program.source_code = analysis.source_code
+            AND program.source_program_id = analysis.source_program_id
+        WHERE analysis.source_code = #{sourceCode}
+          AND analysis.source_program_id = #{sourceProgramId}
+          AND program.is_source_present = TRUE
+    </select>
+
+    <!-- 목록·검색 응답의 공고들 중 현재 공고 내용 기준 완료 분석만 한 번에 읽습니다. 기본 키 복합 IN으로 조회합니다. -->
+    <select id="findCurrentCompleted" resultMap="supportProgramAnalysisDbRow">
+        SELECT
+            <include refid="analysisColumns" />
+        FROM support_program_analysis analysis
+        INNER JOIN support_program program
+            ON program.source_code = analysis.source_code
+            AND program.source_program_id = analysis.source_program_id
+        WHERE (analysis.source_code, analysis.source_program_id) IN
+            <foreach collection="keys" item="identity" open="(" separator="," close=")">(#{identity.sourceCode}, #{identity.sourceProgramId})</foreach>
+          AND program.is_source_present = TRUE
+          AND analysis.status = 'COMPLETED'
+          AND analysis.program_fingerprint = <include refid="programFingerprint" />
+    </select>
+</mapper>

@@ -2,6 +2,7 @@ package ai.govbiz.core.supportprogram.service.search
 
 import ai.govbiz.core._common.test.RedisTestConnection
 import ai.govbiz.core.supportprogram.domain.*
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramSearchResultRepository
 import ai.govbiz.core.supportprogram.service.dto.SupportProgramSearchResult
 import ai.govbiz.core.supportprogram.service.search.exception.SupportProgramSearchResultExpiredException
@@ -26,7 +27,8 @@ class SupportProgramSearchPreviewServiceTest {
     private val search = Mockito.mock(SupportProgramSearchService::class.java)
     private val connection = RedisTestConnection()
     private val repository = SupportProgramSearchResultRepository(connection.redis, JsonMapper.builder().addModule(KotlinModule.Builder().build()).build())
-    private val service = SupportProgramSearchPreviewService(search, repository)
+    private val analysisRepository = Mockito.mock(SupportProgramAnalysisRepository::class.java)
+    private val service = SupportProgramSearchPreviewService(search, repository, analysisRepository)
     private val conditions = SupportProgramCompanyConditions("대구", "무역", LocalDate.parse("2020-01-02"), "수출")
 
     @AfterEach

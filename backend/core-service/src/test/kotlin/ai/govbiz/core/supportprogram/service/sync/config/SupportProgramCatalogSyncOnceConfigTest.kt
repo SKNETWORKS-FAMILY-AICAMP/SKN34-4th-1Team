@@ -12,7 +12,8 @@ class SupportProgramCatalogSyncOnceConfigTest {
             context.environment.setActiveProfiles("catalog-sync-once")
             val keys = listOf("app.bizinfo.sync.enabled", "app.kstartup.sync.enabled", "app.msit.sync.enabled",
                 "app.cntrade-notice.sync.enabled", "app.support-program-index.enabled", "app.daily-report.queue.enabled",
-                "app.combination-review.queue.enabled", "app.application-form-discovery.queue.enabled", "app.application-form-analysis.enabled", "spring.flyway.enabled")
+                "app.combination-review.queue.enabled", "app.application-form-discovery.queue.enabled", "app.application-form-analysis.enabled",
+                "app.support-program-analysis.enabled", "spring.flyway.enabled")
             context.environment.propertySources.addFirst(MapPropertySource("caller",
                 keys.associateWith { "true" } + ("spring.main.web-application-type" to "none")))
             SupportProgramCatalogSyncOnceConfig.isolate(context)

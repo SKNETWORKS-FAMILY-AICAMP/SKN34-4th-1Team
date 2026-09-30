@@ -12,6 +12,7 @@ import ai.govbiz.core.account.web.SessionOriginInterceptor
 import ai.govbiz.core.supportprogram.domain.SupportProgram
 import ai.govbiz.core.supportprogram.domain.SupportProgramCompanyConditions
 import ai.govbiz.core.supportprogram.domain.SupportProgramStatus
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramSearchResultRepository
 import ai.govbiz.core.supportprogram.repository.exception.SupportProgramSearchResultStoreException
 import ai.govbiz.core.supportprogram.service.admission.SupportProgramRequestAdmissionService
@@ -63,7 +64,8 @@ class SupportProgramSearchPreviewControllerTest {
         JsonDeserializationConfig().strictJsonRequestTypes().customize(it)
     }.build()
     private val repository = SupportProgramSearchResultRepository(connection.redis, mapper)
-    private val preview = SupportProgramSearchPreviewService(search, repository)
+    private val analysisRepository = Mockito.mock(SupportProgramAnalysisRepository::class.java)
+    private val preview = SupportProgramSearchPreviewService(search, repository, analysisRepository)
     private val validator = LocalValidatorFactoryBean().apply {
         setConfigurationInitializer { it.clockProvider { clock } }
         afterPropertiesSet()
@@ -210,7 +212,7 @@ class SupportProgramSearchPreviewControllerTest {
         val failedRepository = Mockito.mock(SupportProgramSearchResultRepository::class.java)
         val token = UUID.randomUUID().toString()
         Mockito.`when`(failedRepository.claim(token, 1L)).thenThrow(SupportProgramSearchResultStoreException(IllegalStateException("private redis payload")))
-        val body = mvc(previewService = SupportProgramSearchPreviewService(search, failedRepository))
+        val body = mvc(previewService = SupportProgramSearchPreviewService(search, failedRepository, analysisRepository))
             .perform(restore(token).member()).andExpect(status().isServiceUnavailable())
             .andExpect(header().string("Cache-Control", "no-store"))
             .andExpect(jsonPath("$.code").value("SUPPORT_PROGRAM_SEARCH_RESULT_STORE_UNAVAILABLE"))

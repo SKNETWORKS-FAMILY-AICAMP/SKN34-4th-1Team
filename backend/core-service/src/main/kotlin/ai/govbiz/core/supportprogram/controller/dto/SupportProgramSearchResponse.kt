@@ -11,7 +11,8 @@ data class SupportProgramSearchResponse(
 ) {
     companion object {
         fun from(result: SupportProgramSearchPreviewResult) = SupportProgramSearchResponse(
-            result.query, java.util.List.copyOf(result.programs.map(SupportProgramResponse::from)),
+            result.query,
+            java.util.List.copyOf(result.programs.map { SupportProgramResponse.from(it, result.analysisSummaries[it.sourceQualifiedId]) }),
             result.totalCount, result.resultToken, result.expiresAt?.toString(),
         )
     }

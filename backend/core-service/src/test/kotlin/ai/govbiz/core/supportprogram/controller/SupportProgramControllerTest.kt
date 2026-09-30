@@ -19,6 +19,25 @@ import ai.govbiz.core.supportprogram.domain.SupportProgramApplicationRoute
 import ai.govbiz.core.supportprogram.domain.SupportProgramApplicationRouteType
 import ai.govbiz.core.supportprogram.facade.AiSupportProgramRetrievalFacade
 import ai.govbiz.core.supportprogram.facade.SupportProgramRankingFacade
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysis
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisAmount
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisCondition
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisConditionCategory
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisConditionKind
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisConditionValues
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisContent
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisDocumentRequirement
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisEvaluationCriterion
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisRequiredDocument
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisScheduleItem
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSelectionStep
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisEvidence
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisEvidenceField
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisStatus
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSummary
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisSupportType
+import ai.govbiz.core.supportprogram.domain.SupportProgramAnalysisText
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramSearchResultRepository
 import ai.govbiz.core.supportprogram.service.admission.SupportProgramRequestAdmissionService
@@ -39,6 +58,7 @@ import ai.govbiz.core.supportprogram.service.search.SupportProgramSearchService
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.stream.Stream
@@ -72,6 +92,9 @@ class SupportProgramControllerTest {
     private lateinit var supportProgramRepository: SupportProgramRepository
 
     @Mock
+    private lateinit var analysisRepository: SupportProgramAnalysisRepository
+
+    @Mock
     private lateinit var retrieval: AiSupportProgramRetrievalFacade
 
     @Mock
@@ -87,6 +110,8 @@ class SupportProgramControllerTest {
     @BeforeEach
     fun setUp() {
         ranking = StubSupportProgramRankingFacade()
+        Mockito.lenient().doReturn(SupportProgramAnalysis.NOT_ANALYZED).`when`(analysisRepository)
+            .findCurrent(Mockito.anyString(), Mockito.anyString())
         val service = SupportProgramSearchService(
             supportProgramRepository,
             ranking,
@@ -96,9 +121,9 @@ class SupportProgramControllerTest {
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 SupportProgramController(
-                    searchService = SupportProgramSearchPreviewService(service, Mockito.mock(SupportProgramSearchResultRepository::class.java)),
+                    searchService = SupportProgramSearchPreviewService(service, Mockito.mock(SupportProgramSearchResultRepository::class.java), analysisRepository),
                     readinessService = readinessService,
-                    detailService = SupportProgramDetailService(supportProgramRepository),
+                    detailService = SupportProgramDetailService(supportProgramRepository, analysisRepository),
                     evidenceService = evidenceService,
                     requestAdmissionService = SupportProgramRequestAdmissionService(SupportProgramRequestAdmissionProperties()),
                 ),
@@ -141,6 +166,29 @@ class SupportProgramControllerTest {
                 jsonPath("$.programs[0].sourceUrl")
                     .value("https://www.bizinfo.go.kr/detail?id=PBLN_TEST"),
             )
+            .andExpect(jsonPath("$.programs[0].analysisSummary").value(nullValue()))
+    }
+
+    @Test
+    fun searchResultsCarryTheCurrentAnalysisSummaryForCards() {
+        Mockito.doReturn(listOf(catalogProgram())).`when`(retrieval)
+            .retrieve("서울 AI", listOf(catalogProgram()))
+        Mockito.doReturn(listOf(catalogProgram())).`when`(supportProgramRepository).findSearchablePresent()
+        ranking.response = { candidates -> listOf(candidates.single().program.copy(recommendationScore = 96, matchedReasons = listOf("서울 AI 기업 대상"))) }
+        Mockito.doReturn(mapOf("BIZINFO:PBLN_TEST" to SupportProgramAnalysisSummary(
+            "서울 AI 기업에 최대 5천만원을 지원합니다.", "최대 5천만원", 50_000_000,
+            listOf(SupportProgramAnalysisSupportType.GRANT, SupportProgramAnalysisSupportType.RND),
+        ))).`when`(analysisRepository).findCurrentSummaries(Mockito.anyList())
+
+        mockMvc.perform(get(PATH).queryParam("query", "서울 AI"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.programs[0].analysisSummary.summaryLine").value("서울 AI 기업에 최대 5천만원을 지원합니다."))
+            .andExpect(jsonPath("$.programs[0].analysisSummary.supportAmountText").value("최대 5천만원"))
+            .andExpect(jsonPath("$.programs[0].analysisSummary.maxAmountKrw").value(50_000_000))
+            .andExpect(jsonPath("$.programs[0].analysisSummary.supportTypes[0]").value("GRANT"))
+            .andExpect(jsonPath("$.programs[0].analysisSummary.supportTypes[1]").value("RND"))
+            .andExpect(jsonPath("$.programs[0].analysisSummary.evidence").doesNotExist())
+            .andExpect(jsonPath("$.programs[0].analysisSummary.conditions").doesNotExist())
     }
 
     @Test
@@ -247,10 +295,99 @@ class SupportProgramControllerTest {
             .andExpect(jsonPath("$.applicationRoute.method").value("온라인 접수"))
             .andExpect(jsonPath("$.applicationRoute.url").value("https://forms.gle/abc123"))
             .andExpect(jsonPath("$.evidenceQuestionSupported").value(true))
-            // 상세는 검색 결과가 아니므로 관련도·추천 이유·자격 판정 필드를 내지 않는다.
+            .andExpect(jsonPath("$.analysis.status").value("NOT_ANALYZED"))
+            .andExpect(jsonPath("$.analysis.analyzedAt").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.summaryLine").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.supportTypes").isEmpty())
+            .andExpect(jsonPath("$.analysis.conditions").isEmpty())
+            .andExpect(jsonPath("$.analysis.supportAmount").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.requiredDocuments").isEmpty())
+            .andExpect(jsonPath("$.analysis.selectionSteps").isEmpty())
+            .andExpect(jsonPath("$.analysis.evaluationCriteria").isEmpty())
+            .andExpect(jsonPath("$.analysis.schedule").isEmpty())
+            .andExpect(jsonPath("$.analysis.sourceAttachmentNames").isEmpty())
+            // 상세는 검색 결과가 아니므로 관련도·추천 이유·자격 판정·카드 요약 필드를 내지 않는다.
             .andExpect(jsonPath("$.matchedReasons").doesNotExist())
             .andExpect(jsonPath("$.recommendationScore").doesNotExist())
             .andExpect(jsonPath("$.eligibilityReview").doesNotExist())
+            .andExpect(jsonPath("$.analysisSummary").doesNotExist())
+    }
+
+    @Test
+    fun returnsTheCompletedAnalysisWithEvidenceInTheDetailContract() {
+        Mockito.doReturn(catalogProgram()).`when`(supportProgramRepository)
+            .findPresentBySourceAndProgramId("BIZINFO", "PBLN_TEST")
+        val evidence = SupportProgramAnalysisEvidence(SupportProgramAnalysisEvidenceField.DETAIL_TEXT, "최대 5천만원 지원")
+        val attachmentEvidence = SupportProgramAnalysisEvidence(
+            SupportProgramAnalysisEvidenceField.ATTACHMENT, "사업계획서 제출", "2026 공고문.hwp",
+        )
+        Mockito.doReturn(SupportProgramAnalysis(
+            status = SupportProgramAnalysisStatus.COMPLETED,
+            analyzedAt = LocalDateTime.of(2026, 10, 1, 10, 0, 0, 123_456_000),
+            content = SupportProgramAnalysisContent(
+                summaryLine = "서울 AI 기업에 최대 5천만원을 지원합니다.",
+                supportTypes = listOf(SupportProgramAnalysisSupportType.GRANT, SupportProgramAnalysisSupportType.RND),
+                supportAmount = SupportProgramAnalysisAmount("최대 5천만원", 50_000_000, evidence),
+                selectionScale = null,
+                conditions = listOf(SupportProgramAnalysisCondition(
+                    kind = SupportProgramAnalysisConditionKind.REQUIRED,
+                    category = SupportProgramAnalysisConditionCategory.BUSINESS_AGE,
+                    text = "창업 7년 이내",
+                    values = SupportProgramAnalysisConditionValues(maxYears = 7.0),
+                    evidence = SupportProgramAnalysisEvidence(SupportProgramAnalysisEvidenceField.TARGET_DESCRIPTION, "창업 7년 이내 기업"),
+                )),
+                contact = SupportProgramAnalysisText("02-000-0000", evidence),
+                requiredDocuments = listOf(SupportProgramAnalysisRequiredDocument(
+                    "사업계획서", SupportProgramAnalysisDocumentRequirement.CONDITIONAL, "법인만", attachmentEvidence,
+                )),
+                selectionSteps = listOf(SupportProgramAnalysisSelectionStep("서류평가", null, attachmentEvidence)),
+                evaluationCriteria = listOf(SupportProgramAnalysisEvaluationCriterion("기술성", 40.0, attachmentEvidence)),
+                schedule = listOf(
+                    SupportProgramAnalysisScheduleItem("접수 마감", LocalDate.of(2026, 10, 31), "10월 31일까지", evidence),
+                    SupportProgramAnalysisScheduleItem("발표평가", null, "11월 중", attachmentEvidence),
+                ),
+                sourceAttachmentNames = listOf("2026 공고문.hwp"),
+            ),
+        )).`when`(analysisRepository).findCurrent("BIZINFO", "PBLN_TEST")
+
+        mockMvc.perform(
+            get(DETAIL_PATH)
+                .queryParam("sourceCode", "BIZINFO")
+                .queryParam("sourceProgramId", "PBLN_TEST"),
+        )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.analysis.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.analysis.analyzedAt").value("2026-10-01T10:00:00"))
+            .andExpect(jsonPath("$.analysis.summaryLine").value("서울 AI 기업에 최대 5천만원을 지원합니다."))
+            .andExpect(jsonPath("$.analysis.supportTypes[0]").value("GRANT"))
+            .andExpect(jsonPath("$.analysis.supportTypes[1]").value("RND"))
+            .andExpect(jsonPath("$.analysis.supportAmount.text").value("최대 5천만원"))
+            .andExpect(jsonPath("$.analysis.supportAmount.maxAmountKrw").value(50_000_000))
+            .andExpect(jsonPath("$.analysis.supportAmount.evidence.field").value("DETAIL_TEXT"))
+            .andExpect(jsonPath("$.analysis.supportAmount.evidence.quote").value("최대 5천만원 지원"))
+            .andExpect(jsonPath("$.analysis.selectionScale").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.conditions[0].kind").value("REQUIRED"))
+            .andExpect(jsonPath("$.analysis.conditions[0].category").value("BUSINESS_AGE"))
+            .andExpect(jsonPath("$.analysis.conditions[0].values.maxYears").value(7.0))
+            .andExpect(jsonPath("$.analysis.conditions[0].values.regions").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.conditions[0].evidence.field").value("TARGET_DESCRIPTION"))
+            .andExpect(jsonPath("$.analysis.contact.text").value("02-000-0000"))
+            .andExpect(jsonPath("$.analysis.supportAmount.evidence.attachmentName").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.requiredDocuments[0].name").value("사업계획서"))
+            .andExpect(jsonPath("$.analysis.requiredDocuments[0].requirement").value("CONDITIONAL"))
+            .andExpect(jsonPath("$.analysis.requiredDocuments[0].note").value("법인만"))
+            .andExpect(jsonPath("$.analysis.requiredDocuments[0].evidence.field").value("ATTACHMENT"))
+            .andExpect(jsonPath("$.analysis.requiredDocuments[0].evidence.attachmentName").value("2026 공고문.hwp"))
+            .andExpect(jsonPath("$.analysis.selectionSteps[0].name").value("서류평가"))
+            .andExpect(jsonPath("$.analysis.selectionSteps[0].note").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.evaluationCriteria[0].item").value("기술성"))
+            .andExpect(jsonPath("$.analysis.evaluationCriteria[0].points").value(40.0))
+            .andExpect(jsonPath("$.analysis.schedule[0].date").value("2026-10-31"))
+            .andExpect(jsonPath("$.analysis.schedule[1].date").value(nullValue()))
+            .andExpect(jsonPath("$.analysis.schedule[1].text").value("11월 중"))
+            .andExpect(jsonPath("$.analysis.sourceAttachmentNames[0]").value("2026 공고문.hwp"))
+            .andExpect(jsonPath("$.analysis.analysisVersion").doesNotExist())
+            .andExpect(jsonPath("$.analysis.model").doesNotExist())
     }
 
     @Test

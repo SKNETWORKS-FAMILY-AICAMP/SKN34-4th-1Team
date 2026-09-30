@@ -56,6 +56,7 @@ class SupportProgramCatalogSyncOnceConfig {
             "app.cntrade-notice.sync.enabled", "app.support-program-index.enabled",
             "app.daily-report.enabled", "app.daily-report.queue.enabled", "app.daily-report.queue.delivery-enabled",
             "app.combination-review.queue.enabled", "app.application-form-discovery.queue.enabled", "app.application-form-analysis.enabled",
+            "app.support-program-analysis.enabled",
             "app.account.oauth.unlink.enabled", "app.account.oauth.unlink.queue-enabled",
             "app.daily-report.mail-enabled", "app.account.password-reset.mail-enabled", "spring.flyway.enabled",
         ).associateWith { false }

@@ -20,6 +20,7 @@ import ai.govbiz.core.supportprogram.service.readiness.SupportProgramSearchReadi
 import ai.govbiz.core.supportprogram.service.search.SupportProgramSearchPreviewService
 import ai.govbiz.core.supportprogram.service.search.SupportProgramSearchService
 import java.time.Clock
+import ai.govbiz.core.supportprogram.repository.SupportProgramAnalysisRepository
 import ai.govbiz.core.supportprogram.repository.SupportProgramSearchResultRepository
 import java.time.Instant
 import java.time.ZoneOffset
@@ -65,7 +66,7 @@ class SupportProgramConversationControllerTest {
         val admission = SupportProgramRequestAdmissionService(SupportProgramRequestAdmissionProperties(perClient, global, concurrent)) { 0L }
         return MockMvcBuilders.standaloneSetup(
             SupportProgramConversationController(service, admission),
-            SupportProgramController(SupportProgramSearchPreviewService(search, Mockito.mock(SupportProgramSearchResultRepository::class.java)), readiness, detail, evidence, admission),
+            SupportProgramController(SupportProgramSearchPreviewService(search, Mockito.mock(SupportProgramSearchResultRepository::class.java), Mockito.mock(SupportProgramAnalysisRepository::class.java)), readiness, detail, evidence, admission),
         ).setCustomArgumentResolvers(AuthenticatedAccountArgumentResolver { Mockito.mock(AccountSessionService::class.java) })
             .setControllerAdvice(ApiExceptionHandler()).setValidator(validator)
             .setMessageConverters(JacksonJsonHttpMessageConverter(mapper)).build()

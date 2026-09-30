@@ -93,7 +93,7 @@ class SupportProgramController(
         @Pattern(regexp = "(?Us)^(?!\\s)(?!.*\\s$)(?!.*\\p{C}).+$")
         sourceProgramId: String,
     ): SupportProgramDetailResponse =
-        SupportProgramDetailResponse.from(detailService.get(sourceCode, sourceProgramId))
+        SupportProgramDetailResponse.from(detailService.getDetail(sourceCode, sourceProgramId))
 
     @PostMapping("/detail/answers")
     fun answerFromOfficialSource(

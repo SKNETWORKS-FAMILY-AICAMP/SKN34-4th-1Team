@@ -1,13 +1,14 @@
 package ai.govbiz.core.supportprogram.controller.dto
 
-import ai.govbiz.core.supportprogram.domain.SupportProgram
 import ai.govbiz.core.supportprogram.domain.SupportProgramStatus
 import ai.govbiz.core.supportprogram.domain.SupportProgramApplicationRoute
+import ai.govbiz.core.supportprogram.service.dto.SupportProgramDetailResult
 import ai.govbiz.core.supportprogram.service.evidence.SupportProgramEvidenceService
 
 /**
  * 공고 상세 조회 응답입니다. 검색 결과와 달리 관련도·추천 이유·자격 판정을 담지 않으며,
  * 상세 화면이 제공처를 직접 비교하지 않도록 원문 근거 질문 지원 여부를 서버가 정합니다.
+ * analysis는 항상 포함되며 현재 공고 내용 기준의 AI 분석이 없으면 NOT_ANALYZED입니다.
  */
 data class SupportProgramDetailResponse(
     val id: String,
@@ -26,10 +27,12 @@ data class SupportProgramDetailResponse(
     val sourceUrl: String,
     val applicationRoute: SupportProgramApplicationRouteResponse,
     val evidenceQuestionSupported: Boolean,
+    val analysis: SupportProgramAnalysisResponse,
 ) {
     companion object {
-        fun from(program: SupportProgram): SupportProgramDetailResponse =
-            SupportProgramDetailResponse(
+        fun from(result: SupportProgramDetailResult): SupportProgramDetailResponse {
+            val program = result.program
+            return SupportProgramDetailResponse(
                 id = program.id,
                 sourceCode = program.sourceCode,
                 title = program.title,
@@ -46,7 +49,9 @@ data class SupportProgramDetailResponse(
                 sourceUrl = program.sourceUrl,
                 applicationRoute = SupportProgramApplicationRouteResponse.from(program.applicationRoute),
                 evidenceQuestionSupported = program.sourceCode == SupportProgramEvidenceService.BIZINFO_SOURCE_CODE,
+                analysis = SupportProgramAnalysisResponse.from(result.analysis),
             )
+        }
     }
 }
 
