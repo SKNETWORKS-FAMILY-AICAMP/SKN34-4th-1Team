@@ -56,7 +56,8 @@ async def test_agent_models_tool_client_and_service_are_wired_and_closed(monkeyp
         assert isinstance(container.assistant_agent_service, AssistantAgentService)
         assert container.assistant_agent_service._tracing is container.llm_tracing
         assert container.assistant_agent_service._timeout_seconds == 15.0
-        general, ranking, application, combination, classify, agent = FakeChatOpenAI.instances
+        # 공고 분석 모델 설정은 tests/test_bootstrap.py가 확인합니다.
+        general, ranking, _analysis, application, combination, classify, agent = FakeChatOpenAI.instances
         assert application.kwargs["root_async_client"] is client
         assert application.kwargs["timeout"] == 1.25
         assert application.kwargs["max_retries"] == 0
@@ -90,8 +91,9 @@ async def test_supplied_agent_service_skips_model_and_client_construction(monkey
     try:
         assert container.assistant_agent_service is service
         assert container.assistant_tool_client is None
-        assert len(FakeChatOpenAI.instances) == 4
-        assert FakeChatOpenAI.instances[3].kwargs["max_tokens"] == 6000
+        # 일반·랭킹·공고 분석·신청 준비·중복 검토 모델만 만들고 도우미 에이전트 모델은 만들지 않습니다.
+        assert len(FakeChatOpenAI.instances) == 5
+        assert FakeChatOpenAI.instances[4].kwargs["max_tokens"] == 6000
     finally:
         await container.close()
     assert client.closed
