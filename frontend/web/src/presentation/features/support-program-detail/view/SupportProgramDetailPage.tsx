@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 
 import { loginPathFor } from '../../../shared/auth/returnPath'
@@ -477,9 +477,9 @@ function AnalysisSection({ analysis, check, loginPath }: {
                 <span className={s.conditionLine}>
                   <span className={s.conditionChip}>{supportProgramConditionCategoryLabels[condition.category]}</span>
                   <span>{condition.text}</span>
+                  <EvidenceHint evidence={condition.evidence} />
                 </span>
                 <ConditionCheckResult check={check} index={index} kind={condition.kind} />
-                <EvidenceQuote evidence={condition.evidence} />
               </li>
             ))}
           </ul>
@@ -488,8 +488,10 @@ function AnalysisSection({ analysis, check, loginPath }: {
       {analysis.contact ? (
         <section className={s.proseSection}>
           <h3 className={s.proseTitle}>문의처</h3>
-          <p className={s.summary}>{analysis.contact.text}</p>
-          <EvidenceQuote evidence={analysis.contact.evidence} />
+          <p className={`${s.summary} ${s.hintLine}`}>
+            <span>{analysis.contact.text}</span>
+            <EvidenceHint evidence={analysis.contact.evidence} />
+          </p>
         </section>
       ) : null}
       <p className={s.note} role="note">
@@ -511,8 +513,15 @@ function PreparationSection({ analysis }: { analysis: CompletedAnalysis }) {
     <section className={s.prose} aria-labelledby="support-program-preparation">
       <div className={s.analysisHeader}>
         <h2 id="support-program-preparation" className={s.proseTitle}>신청 준비</h2>
-        <span className={s.analysisMeta}>
-          AI 정리{analysis.sourceAttachmentNames.length ? ` · 첨부 ${analysis.sourceAttachmentNames.join(', ')}` : ''}
+        {/* 분석에 쓴 첨부 이름은 길어서 개수만 적고 이름은 도움말로 보여 줍니다. */}
+        <span className={`${s.analysisMeta} ${s.hintLine}`}>
+          AI 정리{analysis.sourceAttachmentNames.length ? ` · 첨부 ${analysis.sourceAttachmentNames.length}개` : ''}
+          {analysis.sourceAttachmentNames.length ? (
+            <Hint label="분석에 쓴 첨부 보기">
+              <b className={s.hintTitle}>분석에 쓴 첨부</b>
+              <ul className={s.hintList}>{analysis.sourceAttachmentNames.map((name) => <li key={name}>{name}</li>)}</ul>
+            </Hint>
+          ) : null}
         </span>
       </div>
       {schedule.length ? (
@@ -524,8 +533,8 @@ function PreparationSection({ analysis }: { analysis: CompletedAnalysis }) {
                 <span className={s.conditionLine}>
                   <span className={s.conditionChip}>{entry.date ?? '날짜 미정'}</span>
                   <span><b>{entry.label}</b> · {entry.text}</span>
+                  <EvidenceHint evidence={entry.evidence} />
                 </span>
-                <EvidenceQuote evidence={entry.evidence} />
               </li>
             ))}
           </ol>
@@ -540,8 +549,8 @@ function PreparationSection({ analysis }: { analysis: CompletedAnalysis }) {
                 <span className={s.conditionLine}>
                   <span className={s.conditionChip}>{supportProgramDocumentRequirementLabels[document.requirement]}</span>
                   <span>{document.name}{document.note ? ` · ${document.note}` : ''}</span>
+                  <EvidenceHint evidence={document.evidence} />
                 </span>
-                <EvidenceQuote evidence={document.evidence} />
               </li>
             ))}
           </ul>
@@ -556,8 +565,8 @@ function PreparationSection({ analysis }: { analysis: CompletedAnalysis }) {
                 <span className={s.conditionLine}>
                   <span className={s.conditionChip}>{index + 1}단계</span>
                   <span>{step.name}{step.note ? ` · ${step.note}` : ''}</span>
+                  <EvidenceHint evidence={step.evidence} />
                 </span>
-                <EvidenceQuote evidence={step.evidence} />
               </li>
             ))}
           </ol>
@@ -572,8 +581,8 @@ function PreparationSection({ analysis }: { analysis: CompletedAnalysis }) {
                 <span className={s.conditionLine}>
                   <span className={s.conditionChip}>{criterion.points === null ? '배점 미기재' : `${criterion.points}점`}</span>
                   <span>{criterion.item}</span>
+                  <EvidenceHint evidence={criterion.evidence} />
                 </span>
-                <EvidenceQuote evidence={criterion.evidence} />
               </li>
             ))}
           </ul>
@@ -644,13 +653,40 @@ function ConditionCheckResult({ check, index, kind }: {
 
 const checkToneClass = { MET: s.checkMet, NOT_MET: s.checkNotMet, UNKNOWN: s.checkUnknown } as const
 
-/** 분석 항목의 원문 인용입니다. 기본은 접어 두고 어느 부분에서 왔는지 함께 보여 줍니다. */
-function EvidenceQuote({ evidence }: { evidence: SupportProgramAnalysisEvidence }) {
+/** 분석 항목의 원문 인용입니다. 항목 문장 옆 ! 아이콘의 도움말로 어느 부분에서 왔는지와 함께 보여 줍니다. */
+function EvidenceHint({ evidence }: { evidence: SupportProgramAnalysisEvidence }) {
   return (
-    <details className={s.evidence}>
-      <summary>원문 근거 · {supportProgramEvidenceSourceLabel(evidence)}</summary>
-      <blockquote className={s.evidenceQuote}>{evidence.quote}</blockquote>
-    </details>
+    <Hint label="원문 근거 보기">
+      <b className={s.hintTitle}>원문 근거 · {supportProgramEvidenceSourceLabel(evidence)}</b>
+      <span className={s.evidenceQuote}>{evidence.quote}</span>
+    </Hint>
+  )
+}
+
+/**
+ * ! 아이콘 도움말입니다. 마우스를 올리거나 키보드로 초점을 옮기면 열리고, 터치 화면은 눌러서 열고 닫습니다.
+ * Esc나 바깥으로 초점이 나가면 닫힙니다.
+ */
+function Hint({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return (
+    <span className={s.hint} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        className={s.hintButton}
+        aria-label={label}
+        aria-expanded={open}
+        aria-describedby={open ? id : undefined}
+        onClick={() => setOpen((value) => !value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}
+      >
+        <Icon name="info" size={15} />
+      </button>
+      {open ? <span role="tooltip" id={id} className={s.hintPopover}>{children}</span> : null}
+    </span>
   )
 }
 
@@ -681,6 +717,7 @@ const iconPaths = {
   shield: 'M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6zM9 12l2 2 4-4',
   alert: 'M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
   search: 'm21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5v5.5m0 3.5h.01',
 } as const
 
 function Icon({ name, size = 20, filled = false }: { name: keyof typeof iconPaths; size?: number; filled?: boolean }) {

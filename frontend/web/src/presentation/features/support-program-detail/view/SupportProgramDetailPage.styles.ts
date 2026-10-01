@@ -75,8 +75,20 @@ export const supportProgramDetailStyles = {
   checkMet: 'bg-brand-soft text-brand-primary',
   checkNotMet: 'bg-warning-soft text-warning',
   checkUnknown: 'bg-surface text-ink-muted',
-  evidence: 'text-[0.8125rem] text-ink-muted [&_summary]:cursor-pointer [&_summary]:select-none [&_summary]:text-ink-subtle',
-  evidenceQuote: 'm-0 mt-1 whitespace-pre-line border-l-2 border-line-strong pl-2 leading-[1.6]',
+  // 원문 근거·첨부 이름 도움말입니다. 항목 문장 끝의 ! 아이콘에 붙고, 열리면 아이콘 아래에 겹쳐 뜹니다.
+  hintLine: 'inline-flex flex-wrap items-center gap-1',
+  hint: 'relative inline-flex shrink-0 align-middle',
+  hintButton: classes(
+    'inline-grid size-6 cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-ink-subtle',
+    'hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-primary aria-expanded:text-brand-primary',
+  ),
+  hintPopover: classes(
+    'absolute top-7 right-0 z-20 flex w-[min(20rem,calc(100vw-3rem))] flex-col gap-1.5 rounded-xl border border-line bg-surface px-3 py-2.5',
+    'text-left text-[0.8125rem] font-normal leading-[1.6] text-app-ink shadow-[0_8px_24px_rgba(15,23,42,0.12)]',
+  ),
+  hintTitle: 'text-[0.75rem] font-semibold text-ink-muted [overflow-wrap:anywhere]',
+  hintList: 'm-0 flex list-none flex-col gap-1 p-0 [overflow-wrap:anywhere]',
+  evidenceQuote: 'm-0 whitespace-pre-line border-l-2 border-line-strong pl-2',
   note:'m-0 flex items-start gap-2.5 text-[0.8125rem] leading-[1.6] text-ink-muted',
   notePill: 'shrink-0 rounded-full bg-surface-muted px-[9px] py-0.5 text-[0.75rem] font-semibold text-ink-muted',
   // 할 일 카드입니다. 넓은 화면은 오른쪽 흰 카드, 좁은 화면은 아래 고정 동작 바가 되고 나머지 줄은 [더 보기]로 펼칩니다.
