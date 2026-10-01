@@ -12,6 +12,7 @@
 SupportProgramAnalysisWorker (@Scheduled, 전용 단일 스레드)
   → SupportProgramAnalysisService.runNext()
   → SupportProgramAnalysisRepository.countAttemptedSince  (일일 한도 확인)
+  → CatalogProjectionProgress.readySources                (시작 후 Catalog 투영을 마친 제공처만)
   → SupportProgramAnalysisRepository.claimNext            (실행권 선점, 짧은 DB transaction)
   → SupportProgramRepository                             (현재 공고 조회)
   → SupportProgramEvidenceService.sourceDocument         (기업마당만: 원문 캐시 재사용 또는 BizInfo Facade로 재수집)
@@ -41,6 +42,9 @@ SupportProgramAnalysisWorker (@Scheduled, 전용 단일 스레드)
 - 보낼 첨부 고르기(`AiSupportProgramAnalysisMapper`): 이름에 `공고`가 있는 첨부를 먼저, 나머지는 원래 순서로 최대 8개를
   보냅니다. 본문 합계가 40,000 코드 포인트를 넘지 않도록 앞 첨부부터 남은 한도만큼 자르고, 한도를 다 쓰면 이후 첨부는
   보내지 않습니다. 이름은 255자로 자르고 비어 있으면 `첨부 N`을 씁니다. 첨부가 없으면 `attachments: []`입니다.
+- 기업마당처럼 같은 문서를 한글 파일과 PDF 변환본으로 함께 올리는 제공처를 위해, 확장자를 뺀 이름이 같은 첨부는 한 문서로
+  보고 HWPX → HWP → DOCX → PDF 순으로 하나만 보냅니다. 2026-10-01 로컬 실측에서 같은 공고문이 두 번 들어가 입력이
+  거의 두 배가 되던 문제입니다.
 - 파일별 파싱 실패(미지원 형식·암호화·크기 초과·본문 50자 미만·손상)는 그 파일만 제외하고 셉니다.
 - 첨부 목록 자체가 없거나 쓸 수 없는 경우(`UNSUPPORTED` 첨부 없음, `TOO_LARGE` 목록 한도 초과, `NOT_FOUND`, `INVALID`
   페이지 검증 실패)는 첨부 없이 분석합니다. 제공처 연결 실패·시간 초과(`UNAVAILABLE`)는 `SOURCE_UNAVAILABLE`로 실패하고
@@ -140,6 +144,10 @@ Core는 `AiSupportProgramAnalysisMapper.EXPECTED_ANALYSIS_VERSION`(`govbiz-suppo
 | `app.ai-service.support-program-analysis-read-timeout` | `AI_SUPPORT_PROGRAM_ANALYSIS_READ_TIMEOUT` | `120s` |
 
 - Worker와 전용 scheduler는 `enabled=true`일 때만 만들어집니다. `catalog-sync-once` 프로필은 이 값을 강제로 끕니다.
+- Catalog 투영(`app.catalog.projection.enabled=true`)을 쓰는 Core는 프로세스가 시작된 뒤 투영 호출이 한 번 이상 예외 없이
+  끝난 제공처(변경 반영·변경 없음 모두)의 공고만 분석합니다. 아직 한 곳도 없으면 `WAITING_FOR_CATALOG_PROJECTION`을 남기고
+  건너뜁니다. 시작 직후 이전 공고 내용으로 분석했다가 첫 투영이 내용을 바꿔 같은 공고를 다시 분석하던 낭비를 막습니다.
+  투영이 계속 실패하는 제공처는 분석하지 않습니다. 투영을 쓰지 않는(Core가 직접 동기화하는) 환경은 제한하지 않습니다.
 - 일일 한도는 서울 날짜 0시 이후 `last_attempt_at`이 기록된 **공고 수**입니다. 같은 공고의 같은 날 재시도는 한 번으로
   셉니다. 따라서 하루 AI 호출 수의 이론적 상한은 `daily-limit × max-attempts`입니다. 여러 인스턴스가 동시에 한도 직전에
   확인하면 인스턴스 수만큼 초과할 수 있습니다.
