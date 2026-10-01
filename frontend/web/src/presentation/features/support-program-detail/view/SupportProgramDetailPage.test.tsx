@@ -220,8 +220,17 @@ describe('공고 분석 표시', () => {
     expect(hints[2].getAttribute('aria-describedby')).toBe(tooltip.id)
     fireEvent.keyDown(hints[2], { key: 'Escape' })
     expect(within(analysis).queryByRole('tooltip')).toBeNull()
-    fireEvent.mouseEnter(hints[0].parentElement as HTMLElement)
+    // 마우스를 올리면 보이고, 올린 채 눌러도 닫히지 않고 고정됩니다.
+    fireEvent.pointerEnter(hints[0].parentElement as HTMLElement, { pointerType: 'mouse' })
     expect(within(within(analysis).getByRole('tooltip')).getByText('원문 근거 · 지원 대상')).toBeTruthy()
+    fireEvent.click(hints[0])
+    fireEvent.pointerLeave(hints[0].parentElement as HTMLElement, { pointerType: 'mouse' })
+    expect(within(within(analysis).getByRole('tooltip')).getByText('원문 근거 · 지원 대상')).toBeTruthy()
+    fireEvent.click(hints[0])
+    expect(within(analysis).queryByRole('tooltip')).toBeNull()
+    // 터치는 올림으로 열지 않습니다.
+    fireEvent.pointerEnter(hints[1].parentElement as HTMLElement, { pointerType: 'touch' })
+    expect(within(analysis).queryByRole('tooltip')).toBeNull()
   })
 
   it('첨부 공고문까지 분석한 공고는 일정 · 제출 서류 · 선정 절차 · 평가 기준을 첨부 인용과 함께 보여 준다', async () => {

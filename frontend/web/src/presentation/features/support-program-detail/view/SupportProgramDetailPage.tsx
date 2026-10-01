@@ -488,9 +488,8 @@ function AnalysisSection({ analysis, check, loginPath }: {
       {analysis.contact ? (
         <section className={s.proseSection}>
           <h3 className={s.proseTitle}>문의처</h3>
-          <p className={`${s.summary} ${s.hintLine}`}>
-            <span>{analysis.contact.text}</span>
-            <EvidenceHint evidence={analysis.contact.evidence} />
+          <p className={s.summary}>
+            {analysis.contact.text} <EvidenceHint evidence={analysis.contact.evidence} />
           </p>
         </section>
       ) : null}
@@ -664,24 +663,30 @@ function EvidenceHint({ evidence }: { evidence: SupportProgramAnalysisEvidence }
 }
 
 /**
- * ! 아이콘 도움말입니다. 마우스를 올리거나 키보드로 초점을 옮기면 열리고, 터치 화면은 눌러서 열고 닫습니다.
- * Esc나 바깥으로 초점이 나가면 닫힙니다.
+ * ! 아이콘 도움말입니다. 마우스를 올리는 동안 보이고, 누르거나 키보드(Enter·Space)로 고정해 열고 다시 눌러 닫습니다.
+ * 올림(마우스만)과 고정을 따로 두어, 마우스로 누를 때 올림으로 열린 도움말이 바로 닫히지 않고 터치 화면은 누름으로만
+ * 열고 닫습니다. Esc나 바깥으로 초점이 나가면 닫힙니다.
  */
 function Hint({ label, children }: { label: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  const open = hovered || pinned
   const id = useId()
   return (
-    <span className={s.hint} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <span
+      className={s.hint}
+      onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true) }}
+      onPointerLeave={() => setHovered(false)}
+    >
       <button
         type="button"
         className={s.hintButton}
         aria-label={label}
         aria-expanded={open}
         aria-describedby={open ? id : undefined}
-        onClick={() => setOpen((value) => !value)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}
+        onClick={() => setPinned((value) => !value)}
+        onBlur={() => setPinned(false)}
+        onKeyDown={(event) => { if (event.key === 'Escape') { setPinned(false); setHovered(false) } }}
       >
         <Icon name="info" size={15} />
       </button>
