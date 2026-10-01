@@ -305,6 +305,7 @@ describe('공고 분석 표시', () => {
     renderDetail()
     await screen.findByRole('heading', { name: supportPrograms[0].title })
     expect(screen.getByText('공고 본문에 명시 없음')).toBeTruthy()
+    expect(screen.getByText(/내 조건 비교는 회사 소재지·업력만 확인해요/)).toBeTruthy()
     expect(screen.getByText('공고 본문에 명시된 신청 조건이 없어요. 원문 공고에서 확인해 주세요.')).toBeTruthy()
     expect(screen.queryByText('AI 요약')).toBeNull()
   })

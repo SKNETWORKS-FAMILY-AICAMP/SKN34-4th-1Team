@@ -268,7 +268,7 @@ describe('App navigation', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     fireEvent.click(within(getProgramCard(conditionMatchedProgram.title)).getByRole('link', { name: '상세 조건 보기' }))
     await screen.findByRole('note')
-    expect(screen.getByText(/기업 조건으로 자격을 다시 평가하지 않아요/)).toBeTruthy()
+    expect(screen.getByText(/공고 분석 전이라 회사 조건과 비교하지 않았어요/)).toBeTruthy()
     expect(screen.queryByText('조건 확인 · API 본문 기준')).toBeNull()
     fireEvent.click(screen.getByRole('link', { name: '검색 결과로 돌아가기' }))
     expect(within(getProgramCard(conditionMatchedProgram.title)).getByText('조건 확인 · API 본문 기준')).toBeTruthy()

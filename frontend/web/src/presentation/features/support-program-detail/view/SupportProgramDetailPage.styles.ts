@@ -42,7 +42,7 @@ export const supportProgramDetailStyles = {
   summary: 'm-0 max-w-[620px] text-[1rem] leading-[1.75] text-app-ink max-[599px]:max-w-none max-[599px]:leading-[1.7]',
   // 한눈에 보기입니다. 넓은 화면은 흰 카드에 두 열 정의 목록, 좁은 화면은 연한 바탕에 한 열입니다.
   glance: 'rounded-2xl border border-line bg-surface px-6 pt-1.5 pb-2 max-[599px]:px-4 max-[599px]:pt-1',
-  // 공고 내용 카드입니다. 지원 내용 · 지원 대상 절과 자격 미평가 안내.
+  // 공고 내용 카드입니다. 지원 내용 · 지원 대상 절과 자격 안내.
   prose: 'flex flex-col gap-5 rounded-2xl border border-line bg-surface px-6 py-5 max-[599px]:gap-4 max-[599px]:px-4 max-[599px]:py-4',
   proseSection: 'flex flex-col gap-1.5',
   proseTitle: 'm-0 text-[0.9375rem] font-semibold text-app-ink',
