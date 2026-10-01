@@ -16,6 +16,7 @@ interface SupportProgramAnalysisMapper {
         @Param("now") now: LocalDateTime,
         @Param("maxAttempts") maxAttempts: Int,
         @Param("expectedVersion") expectedVersion: String,
+        @Param("sourceCodes") sourceCodes: Collection<String>?,
     ): SupportProgramAnalysisDbRow?
 
     /** 새 공고의 PENDING 행을 만들며 이미 있으면 바꾸지 않습니다. */

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component
 class CatalogProjectionScheduler(
     private val service: CatalogProjectionService,
     private val properties: CatalogClientProperties,
+    private val progress: CatalogProjectionProgress,
 ) {
     @Scheduled(
         initialDelayString = "\${app.catalog.projection.initial-delay:PT5S}",
@@ -22,6 +23,7 @@ class CatalogProjectionScheduler(
         for (sourceCode in properties.sources) {
             try {
                 if (service.synchronize(sourceCode)) log.info("catalog_projection source={} outcome=applied", sourceCode)
+                progress.markProjected(sourceCode)
             } catch (exception: CatalogServiceCallException) {
                 log.warn("catalog_projection source={} outcome=retained_previous failure={}", sourceCode, exception.failure)
             } catch (exception: RuntimeException) {

@@ -79,6 +79,20 @@ class AiSupportProgramAnalysisMapperTest {
     }
 
     @Test
+    fun sendsOneCopyPerDocumentPreferringHangulOriginalsOverPdfConversions() {
+        val request = AiSupportProgramAnalysisMapper.toRequest(program, null, listOf(
+            SupportProgramAttachmentText("붙임1. 모집 공고문.pdf", "PDF 변환본"),
+            SupportProgramAttachmentText("붙임2. 신청서 서식.hwpx", "서식 원본"),
+            SupportProgramAttachmentText("붙임1. 모집 공고문.HWPX", "한글 원본"),
+            SupportProgramAttachmentText("붙임2. 신청서 서식.pdf", "서식 PDF"),
+            SupportProgramAttachmentText("붙임3. 안내.pdf", "PDF만 있는 첨부"),
+        ))
+
+        assertEquals(listOf("붙임1. 모집 공고문.HWPX", "붙임2. 신청서 서식.hwpx", "붙임3. 안내.pdf"), request.attachments.map { it.name })
+        assertEquals("한글 원본", request.attachments.first().text)
+    }
+
+    @Test
     fun clipsLongNamesAndNamesBlankAttachments() {
         val request = AiSupportProgramAnalysisMapper.toRequest(program, null, listOf(
             SupportProgramAttachmentText("  ", "이름 없는 첨부"),

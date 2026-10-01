@@ -99,6 +99,15 @@ class SupportProgramAnalysisRepositoryIntegrationTest {
     }
 
     @Test
+    fun claimsOnlyProgramsFromTheGivenSourcesWhenSourcesAreLimited() {
+        insert("p1", today.plusDays(3))
+
+        assertNull(repository.claimNext(today, now, MAX_ATTEMPTS, now.plusSeconds(300), VERSION, setOf("OTHER_SOURCE")))
+        assertEquals(0, repository.countAttemptedSince(today.atStartOfDay()))
+        assertEquals("p1", repository.claimNext(today, now, MAX_ATTEMPTS, now.plusSeconds(300), VERSION, setOf(SOURCE))!!.sourceProgramId)
+    }
+
+    @Test
     fun completedAnalysisRoundTripsKoreanSpecialCharactersAndIsNotReanalyzed() {
         insert("p1", today.plusDays(3))
         val lease = claim()!!

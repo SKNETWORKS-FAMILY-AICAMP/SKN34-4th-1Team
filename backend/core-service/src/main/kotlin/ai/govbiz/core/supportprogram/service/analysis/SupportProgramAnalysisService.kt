@@ -13,6 +13,7 @@ import ai.govbiz.core.supportprogram.repository.SupportProgramRepository
 import ai.govbiz.core.supportprogram.service.analysis.config.SupportProgramAnalysisProperties
 import ai.govbiz.core.supportprogram.service.evidence.SupportProgramEvidenceService
 import ai.govbiz.core.supportprogram.service.evidence.exception.SupportProgramEvidenceUnavailableException
+import ai.govbiz.core.supportprogram.service.projection.CatalogProjectionProgress
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
@@ -23,7 +24,7 @@ import org.springframework.stereotype.Service
 /**
  * 모집 중·예정 공고를 하나씩 AI로 분석해 저장합니다.
  *
- * 흐름: 일일 한도 확인 → 실행권 선점(짧은 DB transaction) → 공고·기업마당 원문·공식 첨부 본문 준비 → AI Service 호출
+ * 흐름: 일일 한도 확인 → 시작 후 Catalog 투영을 마친 제공처 확인 → 실행권 선점(짧은 DB transaction) → 공고·기업마당 원문·공식 첨부 본문 준비 → AI Service 호출
  * (모두 DB transaction 밖) → 같은 실행권일 때만 결과 저장. 예상하지 못한 오류는 감추지 않고 전파하며,
  * 이 경우 실행권 만료 뒤 최대 시도 횟수 안에서 다시 선택됩니다.
  */
@@ -35,6 +36,7 @@ class SupportProgramAnalysisService(
     private val attachments: SupportProgramAttachmentTextFacade,
     private val client: AiSupportProgramAnalysisClient,
     private val properties: SupportProgramAnalysisProperties,
+    private val projection: CatalogProjectionProgress,
     @param:Qualifier("seoulClock") private val clock: Clock,
 ) {
     /** 한 공고를 처리했으면 true, 한도 초과나 후보 없음으로 건너뛰었으면 false입니다. */
@@ -45,12 +47,18 @@ class SupportProgramAnalysisService(
             logger.info("support_program_analysis outcome=DAILY_LIMIT_REACHED attempted_today={}", attemptedToday)
             return false
         }
+        val sourceCodes = projection.readySources()
+        if (sourceCodes != null && sourceCodes.isEmpty()) {
+            logger.info("support_program_analysis outcome=WAITING_FOR_CATALOG_PROJECTION")
+            return false
+        }
         val lease = repository.claimNext(
             today = now.toLocalDate(),
             now = now,
             maxAttempts = properties.maxAttempts,
             leaseUntil = now.plusSeconds(properties.leaseSeconds),
             expectedVersion = AiSupportProgramAnalysisMapper.EXPECTED_ANALYSIS_VERSION,
+            sourceCodes = sourceCodes,
         ) ?: return false
 
         val program = programs.findPresentBySourceAndProgramId(lease.sourceCode, lease.sourceProgramId)?.program

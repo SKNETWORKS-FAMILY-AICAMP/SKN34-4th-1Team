@@ -88,6 +88,11 @@
             AND analysis.source_program_id = program.source_program_id
         WHERE program.is_source_present = TRUE
           AND (program.application_end_date IS NULL OR program.application_end_date &gt;= #{today})
+          <!-- 시작 후 Catalog 투영을 마친 제공처만 고릅니다. 목록이 없으면 제한하지 않습니다. -->
+          <if test="sourceCodes != null">
+            AND program.source_code IN
+            <foreach collection="sourceCodes" item="sourceCode" open="(" separator="," close=")">#{sourceCode}</foreach>
+          </if>
           AND (analysis.source_code IS NULL OR (<include refid="claimable" />))
         ORDER BY
             program.application_end_date IS NULL ASC,

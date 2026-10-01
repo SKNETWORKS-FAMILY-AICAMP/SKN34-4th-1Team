@@ -42,8 +42,10 @@ class SupportProgramAnalysisRepository(
         maxAttempts: Int,
         leaseUntil: LocalDateTime,
         expectedVersion: String,
+        /** 이 제공처의 공고만 고릅니다. `null`이면 제한하지 않습니다. */
+        sourceCodes: Set<String>? = null,
     ): SupportProgramAnalysisLease? {
-        val candidate = mapper.findNextCandidate(today, now, maxAttempts, expectedVersion) ?: return null
+        val candidate = mapper.findNextCandidate(today, now, maxAttempts, expectedVersion, sourceCodes) ?: return null
         val fingerprint = requireNotNull(candidate.currentProgramFingerprint) { "candidate fingerprint is missing" }
         mapper.insertPendingIfAbsent(SupportProgramAnalysisDbRow(
             sourceCode = candidate.sourceCode,

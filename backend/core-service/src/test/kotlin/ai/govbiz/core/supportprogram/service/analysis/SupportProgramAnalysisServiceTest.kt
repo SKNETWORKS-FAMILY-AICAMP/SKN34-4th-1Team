@@ -20,6 +20,7 @@ import ai.govbiz.core.supportprogram.repository.SupportProgramRepository
 import ai.govbiz.core.supportprogram.service.analysis.config.SupportProgramAnalysisProperties
 import ai.govbiz.core.supportprogram.service.evidence.SupportProgramEvidenceService
 import ai.govbiz.core.supportprogram.service.evidence.exception.SupportProgramEvidenceUnavailableException
+import ai.govbiz.core.supportprogram.service.projection.CatalogProjectionProgress
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -65,7 +66,10 @@ class SupportProgramAnalysisServiceTest {
 
     @BeforeEach
     fun setUp() {
-        service = SupportProgramAnalysisService(repository, programs, evidenceService, attachments, client, properties, clock)
+        // Core가 공고를 직접 동기화하는 환경처럼 제공처를 제한하지 않습니다.
+        service = SupportProgramAnalysisService(
+            repository, programs, evidenceService, attachments, client, properties, CatalogProjectionProgress(false), clock,
+        )
     }
 
     @Test
@@ -75,6 +79,20 @@ class SupportProgramAnalysisServiceTest {
         assertFalse(service.runNext())
 
         verify(repository, never()).claimNext(LocalDate.of(2026, 10, 1), now, 3, now.plusSeconds(300), VERSION)
+        verifyNoInteractions(client)
+    }
+
+    @Test
+    fun waitsWithoutClaimingUntilAFirstCatalogProjectionFinishesAndThenOnlyPicksProjectedSources() {
+        val progress = CatalogProjectionProgress(true)
+        val projected = SupportProgramAnalysisService(repository, programs, evidenceService, attachments, client, properties, progress, clock)
+
+        assertFalse(projected.runNext())
+        verify(repository, never()).claimNext(LocalDate.of(2026, 10, 1), now, 3, now.plusSeconds(300), VERSION, emptySet())
+
+        progress.markProjected("BIZINFO")
+        assertFalse(projected.runNext())
+        verify(repository).claimNext(LocalDate.of(2026, 10, 1), now, 3, now.plusSeconds(300), VERSION, setOf("BIZINFO"))
         verifyNoInteractions(client)
     }
 

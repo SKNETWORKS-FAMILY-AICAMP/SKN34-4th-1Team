@@ -117,9 +117,18 @@ class CatalogProjectionOwnershipTest {
         val service = mock(CatalogProjectionService::class.java)
         `when`(service.synchronize("BIZINFO")).thenThrow(CatalogServiceCallException(CatalogServiceCallException.Failure.UNAVAILABLE))
         val properties = CatalogClientProperties(URI("http://catalog.test"), "fixture-only-012345678901234567890123", sources = listOf("BIZINFO", "MSIT"))
-        CatalogProjectionScheduler(service, properties).synchronize()
+        val progress = CatalogProjectionProgress(projectionEnabled = true)
+        CatalogProjectionScheduler(service, properties, progress).synchronize()
         verify(service).synchronize("BIZINFO")
         verify(service).synchronize("MSIT")
+        // 실패한 제공처는 분석 대상이 되지 않고, 변경이 없어도 투영 호출이 끝난 제공처는 분석할 수 있습니다.
+        assertEquals(setOf("MSIT"), progress.readySources())
+    }
+
+    @Test
+    fun projectionProgressDoesNotRestrictAnalysisWhenCoreSynchronizesDirectly() {
+        assertNull(CatalogProjectionProgress(projectionEnabled = false).readySources())
+        assertEquals(emptySet<String>(), CatalogProjectionProgress(projectionEnabled = true).readySources())
     }
 
     private fun snapshot() = CatalogProjectionSnapshot(
