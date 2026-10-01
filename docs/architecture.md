@@ -68,7 +68,7 @@ Core의 `AdminPrincipalArgumentResolver → AccountSessionService`가 세션·�
 
 루트 `compose.yaml`은 `infrastructure/compose.catalog.yaml`을 포함해 공고 카탈로그 분리를 기본 적용합니다.
 Catalog는 별도 프로세스·DB로 네 제공처 수집, 정규화, 검색 색인과 공개 snapshot을 소유합니다.
-기업마당 공식 API의 사업신청방법·사업신청URL은 Catalog의 신청 경로로 정규화해 저장합니다.
+기업마당 공식 API의 사업신청방법·사업신청URL과 K-Startup 공식 API의 신청방법 필드는 Catalog의 신청 경로로 정규화해 저장합니다.
 `sourceUrl`은 공고 상세 주소로 유지하며 신청 URL이 없을 때 대체하지 않습니다. Catalog 내부 snapshot이
 신청 경로를 Core projection에 전달하고 Core 상세 응답의 `applicationRoute`가 이를 노출합니다.
 신청 준비의 온라인 입력 안내는 소유권과 공고의 `applicationRoute`를 확인합니다. 공식 경로가
@@ -76,9 +76,11 @@ Catalog는 별도 프로세스·DB로 네 제공처 수집, 정규화, 검색 �
 실제 질문을 읽고, 검증된 payload를 Client의 Mapper에서 내부 Source로 변환합니다. 고정 Manifest의
 결정적 review와 저장된 확정 Fact로 실제 질문 순서의 복사 안내를 만들며, MCP 외부 호출은 DB transaction 밖에서 수행합니다.
 다른 경로는 기존 Manifest 기반 안내를 유지합니다. 답변 입력과 제출은 공식 신청 화면에서 사용자가 직접 수행합니다.
-K-Startup·MSIT·충남 공고는 이번 작업에서 신청 URL 응답 필드의 이름과 의미를 검증하지 못해
-`UNKNOWN`으로 둡니다. K-Startup 공식 데이터 소개에는 신청방법이 언급되지만 현재 사용하는
-공고 응답에서 대응 필드를 확인하기 전까지 임의로 매핑하지 않습니다.
+K-Startup은 2026-10-01 실제 공고 응답 200건으로 신청방법 필드(`aply_mthd_onli_rcpt_istc` 온라인,
+`aply_mthd_eml_rcpt_istc` 이메일, `aply_mthd_vst_rcpt_istc` 방문, `aply_mthd_pssr_rcpt_istc` 우편,
+`aply_mthd_fax_rcpt_istc` 팩스, `aply_mthd_etc_istc` 기타)를 확인했습니다. 온라인 값이 https 주소 하나면 신청 URL로,
+나머지는 "이메일 접수: …"처럼 신청방법 문장으로 남기고 경로 분류는 기업마당과 같은 규칙을 씁니다. 안내 페이지인
+`biz_gdnc_url`과 상세 `detl_pg_url`은 신청 URL로 쓰지 않습니다. MSIT·충남 공고는 대응 필드를 검증하지 못해 `UNKNOWN`입니다.
 신청 경로는 검색 문서·임베딩에 넣지 않으며 URL 분류 중 외부 접속을 하지 않습니다.
 Core는 `CatalogProjectionScheduler → Service → 인증된 HTTP Client → Catalog`로 완전한 응답을 받은 뒤,
 Service가 짧은 transaction을 시작한 뒤 `CatalogProjectionRepository → MyBatis → Core MySQL`로
