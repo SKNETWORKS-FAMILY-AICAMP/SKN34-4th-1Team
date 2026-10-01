@@ -430,3 +430,9 @@ def test_prompt_treats_source_as_data_and_separates_condition_kinds():
                    "attachmentIndex는 field가 ATTACHMENT일 때만", "가장 구체적인 원문", "원문에 나온 순서대로",
                    "일반적인 필수 서류를 지어내지 마세요", "연·월·일을 모두 명시한 날짜만", "모호함이 없을 때만"):
         assert clause in SUPPORT_PROGRAM_ANALYSIS_INSTRUCTIONS
+
+def test_prompt_keeps_financial_and_sanction_exclusions_out_of_company_size():
+    # 실제 공고 분석에서 세금 체납·부채비율 같은 제외 사유가 기업 규모로 분류된 사례를 막는 지침이다.
+    assert "재무 건전성·신용 사유는 COMPANY_SIZE가 아니라 OTHER" in SUPPORT_PROGRAM_ANALYSIS_INSTRUCTIONS
+    assert "참여제한·제재처분" in SUPPORT_PROGRAM_ANALYSIS_INSTRUCTIONS
+    assert "법인사업자 여부는 LEGAL_FORM" in SUPPORT_PROGRAM_ANALYSIS_INSTRUCTIONS
