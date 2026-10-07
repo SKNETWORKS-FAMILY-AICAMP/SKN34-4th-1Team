@@ -130,6 +130,7 @@ test('AI result opens the real program detail and returns to the same draft and 
     getSearchReadiness: jest.fn().mockResolvedValue({ indexReady: true, searchState: 'SEARCHABLE' }),
     search: jest.fn().mockResolvedValue({ query: context.query, totalCount: 1, programs: [program], resultToken: null, expiresAt: null }),
     getDetail: jest.fn().mockResolvedValue(programDetail),
+    getAttachments: jest.fn().mockResolvedValue([]),
   }
   jest.mocked(programClient).mockReturnValue(client as unknown as ReturnType<typeof programClient>)
   const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo')
@@ -156,6 +157,7 @@ test('AI result opens the real program detail and returns to the same draft and 
     await screen.findByLabelText('공식 공고 원문 열기')
     expect(view.getPathname()).toBe('/program')
     expect(client.getDetail).toHaveBeenCalledWith({ sourceCode: program.sourceCode, sourceProgramId: program.id }, expect.anything())
+    expect(client.getAttachments).toHaveBeenCalledWith({ sourceCode: program.sourceCode, sourceProgramId: program.id }, expect.any(AbortSignal))
     expect(screen.getByText('중소기업')).toBeTruthy()
     expect(screen.queryByLabelText('더 보기')).toBeNull()
     await act(async () => router.back())
@@ -170,6 +172,7 @@ test('AI result opens the real program detail and returns to the same draft and 
     expect(client.interpretConversation).toHaveBeenCalledTimes(1)
     expect(client.search).toHaveBeenCalledTimes(1)
     expect(client.getDetail).toHaveBeenCalledTimes(1)
+    expect(client.getAttachments).toHaveBeenCalledTimes(1)
     view.unmount()
   } finally { jest.useRealTimers(); jest.restoreAllMocks() }
 }, 15_000)
