@@ -279,6 +279,8 @@ export function useSupportProgramChat(
           if (result.outcome === 'SEARCH') dispatch(interpretationSucceeded({ requestId, result: result.interpretation }))
           else if (result.outcome === 'EVIDENCE' && selected) dispatch(govMessageSucceeded({ requestId,
             message: result.evidence.answer, evidence: { program: selected, answer: result.evidence } }))
+          else if (result.outcome === 'APPLICATION' && selected) dispatch(govMessageSucceeded({ requestId,
+            message: result.message, application: { program: selected, message: result.message } }))
           else if (result.outcome === 'NEEDS_PROGRAM' || result.outcome === 'UNSUPPORTED') {
             dispatch(govMessageSucceeded({ requestId, message: result.message }))
           }

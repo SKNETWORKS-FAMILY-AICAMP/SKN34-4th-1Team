@@ -272,7 +272,7 @@ function LastAnalysisNotice({ vm }: { vm: NewViewModel }) {
 }
 
 /** ② 양식 · 분야의 내용입니다. 구글 설문 미리 채우기 · 저장된 양식 조회 중 · 실패 · 분석 진행 · 양식 카드 · 양식 없음 중 하나를 보여 줍니다. */
-function FormSectionBody({ vm }: { vm: NewViewModel }) {
+export function FormSectionBody({ vm }: { vm: NewViewModel }) {
   const program = vm.program
   const lookup = vm.availability
   const discoveryError = vm.discoveryError
@@ -335,6 +335,18 @@ function startBlockedReason(vm: NewViewModel): string | null {
   return null
 }
 
+/** 새 문서 화면과 대화 카드에서 같은 조건으로 사용자가 작성을 시작합니다. */
+export function ApplicationPreparationStartAction({ vm, children }: { vm: NewViewModel; children?: ReactNode }) {
+  const reasonId = useId()
+  const blockedReason = startBlockedReason(vm)
+  return <div className={n.actions}>
+    {blockedReason && <p className={n.actionsReason} id={reasonId}>{blockedReason}</p>}
+    {children}
+    <button type="button" className={n.primary} disabled={!vm.selectedForm || vm.discovery !== null || vm.submitting} aria-busy={vm.submitting}
+      aria-describedby={blockedReason ? reasonId : undefined} onClick={() => { void vm.create() }}>{vm.submitting && <ButtonSpinner />}{vm.submitting ? '만드는 중…' : '작성 시작'}</button>
+  </div>
+}
+
 function newPathFor(program: { sourceCode: string; sourceProgramId: string }) {
   return `${appPaths.applicationPreparationNew}?${new URLSearchParams({ sourceCode: program.sourceCode, sourceProgramId: program.sourceProgramId })}`
 }
@@ -370,9 +382,7 @@ function NewPreparation({ addressSourceCode, addressProgramId, onProgramChosen }
   const formHeadingRef = useRef<HTMLHeadingElement>(null)
   const pickerWasOpen = useRef(false)
   const pickerConfirmed = useRef(false)
-  const reasonId = useId()
   const formOpen = vm.program !== null
-  const blockedReason = startBlockedReason(vm)
 
   // 패널이 닫히면, 공고를 고른 경우 ② 제목으로 포커스를 옮겨 이어서 앞으로 진행하게 하고, 버리고 닫은 경우 연 버튼으로 돌려줍니다.
   useEffect(() => {
@@ -396,12 +406,9 @@ function NewPreparation({ addressSourceCode, addressProgramId, onProgramChosen }
           {formOpen && <FormSectionBody vm={vm} />}
         </section>
         {/* 동작은 내용 끝 오른쪽에 둡니다. 탭 순서도 내용 → [취소] → [작성 시작]입니다. 공고를 고르기 전에는 그리지 않습니다. */}
-        {formOpen && <div className={n.actions}>
-          {blockedReason && <p className={n.actionsReason} id={reasonId}>{blockedReason}</p>}
+        {formOpen && <ApplicationPreparationStartAction vm={vm}>
           <Link className={n.ghost} to={appPaths.applicationPreparations}>취소</Link>
-          <button type="button" className={n.primary} disabled={!vm.selectedForm || vm.discovery !== null || vm.submitting} aria-busy={vm.submitting}
-            aria-describedby={blockedReason ? reasonId : undefined} onClick={() => { void vm.create() }}>{vm.submitting && <ButtonSpinner />}{vm.submitting ? '만드는 중…' : '작성 시작'}</button>
-        </div>}
+        </ApplicationPreparationStartAction>}
       </div>
     </main>
     {/* 행을 고르면 그 공고의 저장된 양식을 바로 조회하고(AI 호출 없음), 조회를 마쳐야 [이 공고 선택]을 누를 수 있습니다. */}

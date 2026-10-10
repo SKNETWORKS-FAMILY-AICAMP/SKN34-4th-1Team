@@ -45,8 +45,8 @@ it('관리자는 검색 확인 후 같은 입력창에서 선택 공고의 근�
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '검색 전송' })))
   expect(search).not.toHaveBeenCalled()
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '이 조건으로 검색' })))
-  fireEvent.click(screen.getByRole('button', { name: '이 공고 질문' }))
-  expect(screen.getByText('질문할 공고:')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '이 공고 선택' }))
+  expect(screen.getByText('선택한 공고:')).toBeTruthy()
   const program = supportPrograms[0]
   gov.mockResolvedValue({ outcome: 'EVIDENCE', program: { sourceCode: program.sourceCode, sourceProgramId: program.id },
     evidence: { answer: '누리집에서 신청하세요.', answerStatus: 'ANSWERED', citations: [{ excerpt: '누리집 온라인 신청',
@@ -63,6 +63,6 @@ it('일반 회원은 AI 대화 검색 이름을 유지한다', () => {
   setup('USER')
   expect(screen.getByRole('tab', { name: 'AI 대화 검색' })).toBeTruthy()
   expect(screen.queryByRole('tab', { name: 'Gov 에이전트' })).toBeNull()
-  expect(screen.queryByText(/질문할 공고:/)).toBeNull()
+  expect(screen.queryByText(/선택한 공고:/)).toBeNull()
   expect(document.title).toBe('AI 대화 검색 · GovBiz')
 })

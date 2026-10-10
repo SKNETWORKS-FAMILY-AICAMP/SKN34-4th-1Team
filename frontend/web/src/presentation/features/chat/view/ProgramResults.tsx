@@ -150,7 +150,7 @@ function ProgramCard({ program, interests, onSelectProgram }: { program: Support
       {/* 왼쪽은 새 창으로 여는 원문 링크(새 창 아이콘), 오른쪽은 상세 조건 보기입니다. */}
       <div className={chatPageStyles.programActions}>
         {onSelectProgram ? <button type="button" className={chatPageStyles.programDetailsButton}
-          onClick={() => onSelectProgram(program)}>이 공고 질문</button> : null}
+          onClick={() => onSelectProgram(program)}>이 공고 선택</button> : null}
         <a
           href={program.sourceUrl}
           target="_blank"
