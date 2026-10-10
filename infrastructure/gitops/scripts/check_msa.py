@@ -97,7 +97,10 @@ def policy_errors(service, resources, *, require_ops_migration=True, ops_sync_en
     require(secret_names == {service.removesuffix("-service") + "-runtime"}, "service-scoped secret required")
     if service == "core-service":
         require(env.get("CATALOG_PROJECTION_ENABLED") == "true", "Core must use Catalog")
-        require(env.get("CATALOG_SERVICE_URL") == "http://catalog-service:8081", "wrong Catalog endpoint")
+        require(env.get("CATALOG_SERVICE_URL") in {
+            "http://catalog-service:8081",
+            "http://catalog-service.govbiz-msa.svc.cluster.local:8081",
+        }, "wrong Catalog endpoint")
         for source in ("BIZINFO", "KSTARTUP", "MSIT", "CNTRADE_NOTICE"):
             require(env.get(source + "_SYNC_ENABLED") == "false", "Core source writer enabled")
         require(env.get("SUPPORT_PROGRAM_INDEX_ENABLED") == "false", "Core index writer enabled")

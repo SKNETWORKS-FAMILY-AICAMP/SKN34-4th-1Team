@@ -83,6 +83,20 @@ class MsaChartTests(unittest.TestCase):
         resources = render("core-service", HELM, ["--set-string", "env.BIZINFO_SYNC_ENABLED=true"])
         self.assertIn("core-service: Core source writer enabled", policy_errors("core-service", resources))
 
+    def test_catalog_endpoint_requires_the_same_internal_service(self):
+        resources = render("core-service", HELM)
+        pod = next(r for r in resources if r["kind"] == "Deployment")["spec"]["template"]["spec"]
+        endpoint = next(e for e in pod["containers"][0]["env"] if e["name"] == "CATALOG_SERVICE_URL")
+        for url in ("http://catalog-service:8081", "http://catalog-service.govbiz-msa.svc.cluster.local:8081"):
+            endpoint["value"] = url
+            self.assertEqual(policy_errors("core-service", resources), [])
+        for url in ("http://localhost:8081", "http://host.docker.internal:8081",
+                    "http://catalog-service.other.svc.cluster.local:8081",
+                    "http://catalog-service.govbiz-msa.svc.cluster.local:8081.evil.invalid"):
+            with self.subTest(url=url):
+                endpoint["value"] = url
+                self.assertIn("core-service: wrong Catalog endpoint", policy_errors("core-service", resources))
+
     def test_local_data_requires_explicit_opt_in(self):
         result = subprocess.run([HELM, "template", "local-data", str(ROOT / "charts/govbiz-local-data")], capture_output=True, check=False)
         self.assertNotEqual(result.returncode, 0)
