@@ -466,6 +466,23 @@ V59 `account_plan.ends_at`이 지나면 FREE 기준으로 돌아갑니다. 사�
 
 ### 도우미 자유 질문
 
+모바일은 로그인된 계정에서 `AssistantProvider → AssistantScreen → shared AskAssistantUseCase → mobile api/assistant →
+Bearer POST /api/v1/assistant/messages → AssistantMessageController → AssistantMessageService → 기존 AI Service`로 연결합니다.
+외부 응답은 모바일 API 경계에서 shared `assistantAnswerDtoSchema` 검증과 `toAssistantAnswer` 변환을 거칩니다.
+모바일 도움말은 플랫폼의 현재 절차·기능을 소유하며 웹의 React·Redux·라우터를 가져오지 않습니다.
+검색어·원문 질문 초안은 API·URL에 새로운 계약을 추가하지 않고 검증된 로그인 세션 메모리로 전달하며 기존 입력 교체 확인 후에만 적용합니다.
+카드 목적지는 종류와 복합 공고 ID를 함께 검증합니다. 대화는 로그인 세션에만 유지하고 버튼 위치만 API·계정별 SecureStore에 보관합니다.
+루트의 이동형 버튼과 메뉴는 같은 전체 화면 Modal을 열며 기존 시트는 배경 버튼을 차단합니다.
+Modal 내부의 별도 `SafeAreaProvider`가 도우미 창의 안전 영역을 측정하며 `AssistantScreen`이 그 값으로 상·하단 여백을 갱신합니다.
+열었던 네이티브 페이지는 `AssistantOrigin.path`에 로컬 문맥으로 보존해 페이지별 주요 질문을 선택합니다.
+주요 질문과 `다른 주제 보기`를 구분하고 재진입 때 추천만 갱신하며 대화는 유지합니다. Core 요청에는 기존 `context.route`·`programSelected`만 전달합니다.
+질문 전송·추천 질문 선택 시 추천 영역을 숨기고 `새 대화`나 다른 페이지·공고에서 열 때 다시 표시합니다.
+추천 표시 상태는 대화·입력과 함께 로그인 세션에 유지하며 같은 화면에서 닫기 후 재진입은 이를 초기화하지 않습니다.
+도움말의 `topic`·`companyAction`·`contextual`은 모바일 UI 메타데이터이며 `assistantHelpInput`에서 제외합니다.
+공고 상세의 로컬 안내는 질문 창 열기만 전달하며, 빈 질문 초안은 기존 입력을 지우거나 AI를 실행하지 않습니다.
+로그아웃·계정 전환·재로그인은 메모리와 진행 요청을 폐기하고 유료 실행을 자동 재전송하지 않습니다.
+자유 질문은 모바일의 `EXPO_PUBLIC_ASSISTANT_AI_ENABLED=true`일 때만 활성화합니다. 아래의 웹 활성화와 Core 도구 에이전트 설정은 별도입니다.
+
 `POST /api/v1/assistant/messages`는 화면 오른쪽 아래 도우미 위젯의 자유 질문을 받으며 로그인한 회원만 씁니다(비로그인 401). 주제·질문 알약(C1)은 네트워크 없이
 프런트 도움말 데이터로 답하고, 프런트 스위치 `VITE_ASSISTANT_AI_ENABLED=true`일 때만 자유 입력이 이 경로로 옵니다(기본 꺼짐, 꺼지면 알약 안내로만 답함). Core는 길이 상한·개인 정보 마스킹·공유 요청 한도를 거친 뒤
 AI Service의 `/internal/v1/assistant/answers`를 한 번 호출해 의도 하나와 그 의도의 필드(인용·검색어·계정 영역·확인 질문)를 받습니다.

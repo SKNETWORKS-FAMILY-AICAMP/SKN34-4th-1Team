@@ -8,13 +8,15 @@ import { ChatScreen } from './ChatScreen'
 import type { LoginRequest } from '../auth/loginFlow'
 import { useSearchProgramInterests } from '../components/SearchProgramInterests'
 import { Button, Notice } from '../ui'
+import type { AssistantDraft } from '../assistant/context'
 
 export type SearchMode = 'ai' | 'filter'
 const modes = [{ value: 'ai', label: 'AI 대화 검색' }, { value: 'filter', label: '필터 검색' }] as const
 
-export function SearchScreen({ mode, headerHeight = 0, onModeChange, onOpenProgram, onLogin }: {
+export function SearchScreen({ mode, headerHeight = 0, onModeChange, onOpenProgram, onLogin, assistantDraft, onDraftConsumed }: {
   mode: SearchMode; headerHeight?: number; onModeChange(mode: SearchMode): void
   onOpenProgram(identity: SupportProgramIdentity): void; onLogin(request?: LoginRequest): void
+  assistantDraft?: AssistantDraft | null; onDraftConsumed?(id: string): void
 }) {
   const [visited, setVisited] = useState<Record<SearchMode, boolean>>({ ai: mode === 'ai', filter: mode === 'filter' })
   const [controlHeight, setControlHeight] = useState(0)
@@ -33,7 +35,8 @@ export function SearchScreen({ mode, headerHeight = 0, onModeChange, onOpenProgr
       testID={`search-panel-${value}`} accessibilityLabel={label}
       accessibilityElementsHidden={mode !== value} importantForAccessibility={mode === value ? 'auto' : 'no-hide-descendants'}
       pointerEvents={mode === value ? 'auto' : 'none'} style={[local.panel, mode !== value && local.hidden]}>
-      {value === 'ai' ? <ChatScreen interests={interests} onOpenProgram={onOpenProgram} onLogin={onLogin} keyboardOffset={headerHeight + controlHeight} active={mode === 'ai'} />
+      {value === 'ai' ? <ChatScreen interests={interests} onOpenProgram={onOpenProgram} onLogin={onLogin} keyboardOffset={headerHeight + controlHeight} active={mode === 'ai'}
+        assistantDraft={assistantDraft} onDraftConsumed={onDraftConsumed} />
         : <CatalogScreen interests={interests} onLogin={() => onLogin()} onOpenProgram={onOpenProgram} keyboardOffset={controlHeight} />}
     </View>)}
   </View>

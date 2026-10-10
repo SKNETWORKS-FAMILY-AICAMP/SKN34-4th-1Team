@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AccountScreen } from '../screens/AccountScreen'
 import { Button, colors } from '../ui'
 import { useAuth, type MobileSession } from './session'
+import { useAssistantBlock } from '../assistant/context'
 
 export type LoginRequest = {
   message?: string
@@ -23,6 +24,7 @@ export function LoginFlowProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false)
   const pendingRef = useRef<LoginRequest | null>(null)
   const insets = useSafeAreaInsets()
+  useAssistantBlock(pending !== null)
   const requestLogin = useCallback((request: LoginRequest = {}) => {
     if (status === 'signedIn' && session) { request.onAuthenticated?.(session); return }
     if (status !== 'signedOut') return

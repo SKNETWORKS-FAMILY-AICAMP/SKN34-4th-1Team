@@ -15,11 +15,13 @@ import { PartnerSheet } from '../components/PartnerSheet'
 import { PlanUsageLine, usePlanUsage } from '../components/PlanUsage'
 import { ProgramPreparationSection } from '../components/PreparationRows'
 import { ProgramAttachments } from '../components/ProgramAttachments'
+import type { AssistantDraft } from '../assistant/context'
 import { Button, Card, Field, Notice, Page, StatusBadge, Subtitle, Title, colors, ddayBadgeTone, styles } from '../ui'
 
-export function ProgramScreen({ identity, onLogin, resumeAction, onResumed }: {
+export function ProgramScreen({ identity, onLogin, resumeAction, onResumed, assistantDraft, onDraftConsumed }: {
   identity: SupportProgramIdentity; onLogin: (action?: 'save' | 'question') => void
   resumeAction?: { action: 'save' | 'question'; token: string }; onResumed?(): void
+  assistantDraft?: AssistantDraft | null; onDraftConsumed?(id: string): void
 }) {
   const { session, status, invalidateSession, refreshSession } = useAuth()
   const token = status === 'signedIn' ? session?.accessToken : undefined
@@ -41,6 +43,7 @@ export function ProgramScreen({ identity, onLogin, resumeAction, onResumed }: {
   const questionRevision = useRef(0)
   const saveWork = useRef<AbortController | null>(null)
   const resumed = useRef(false)
+  const consumedDraft = useRef<string | null>(null), draftOwner = useRef(token); draftOwner.current = token
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const sourceCode = identity.sourceCode
   const sourceProgramId = identity.sourceProgramId
@@ -48,6 +51,19 @@ export function ProgramScreen({ identity, onLogin, resumeAction, onResumed }: {
   const { usage, reload: reloadUsage } = usePlanUsage(token, Boolean(token) && questionOpen && Boolean(program?.evidenceQuestionSupported))
   const questionUsage = findPlanUsageItem(usage, 'EVIDENCE_QUESTION')
   const questionLimitReached = questionUsage !== null && isPlanLimitReached(questionUsage)
+
+  useEffect(() => {
+    if (!token || !program || !assistantDraft || consumedDraft.current === assistantDraft.id || answering) return
+    consumedDraft.current = assistantDraft.id
+    if (!program.evidenceQuestionSupported) { setError('이 제공처 공고는 원문 질문을 지원하지 않아요. 공식 원문을 확인해 주세요.'); onDraftConsumed?.(assistantDraft.id); return }
+    if (assistantDraft.text === '') { if (draftOwner.current === token) setQuestionOpen(true); onDraftConsumed?.(assistantDraft.id); return }
+    const apply = () => { if (draftOwner.current === token) { setQuestion(assistantDraft.text); setQuestionOpen(true) } }
+    if (question.trim() && question !== assistantDraft.text) Alert.alert('입력 중인 질문을 바꿀까요?', '도우미에서 작성한 질문으로 바꿀 수 있어요. 질문은 직접 전송해 주세요.', [
+      { text: '현재 질문 유지', style: 'cancel', onPress: () => onDraftConsumed?.(assistantDraft.id) },
+      { text: '도우미 질문 사용', onPress: () => { apply(); onDraftConsumed?.(assistantDraft.id) } },
+    ])
+    else { apply(); onDraftConsumed?.(assistantDraft.id) }
+  }, [token, program, assistantDraft, answering, question, onDraftConsumed])
 
   useEffect(() => {
     let active = true
@@ -64,6 +80,7 @@ export function ProgramScreen({ identity, onLogin, resumeAction, onResumed }: {
     let active = true
     const controller = new AbortController()
     questionRevision.current += 1
+    consumedDraft.current = null
     work.current?.abort(); saveWork.current?.abort()
     setTurns([]); setAnswerError(null); setQuestion(''); setAnswering(false)
     setSaved(null); setSaveError(null); setSaving(false)
