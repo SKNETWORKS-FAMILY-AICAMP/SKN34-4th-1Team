@@ -400,6 +400,9 @@ describe('useChatPageViewModel', () => {
 
 function createChatHook(overrides: Partial<ChatHook> = {}): ChatHook {
   return {
+    isGovAgent: false,
+    govProgram: null,
+    selectGovProgram: vi.fn(),
     isRestoredHistory: false,
     confirmedContext: emptyConversationContext,
     conversationQuery: null,

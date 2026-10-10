@@ -93,8 +93,7 @@ def crypt(raw, key, *, decrypt=False):
     executable = "openssl"
     if os.name == "nt":
         executable = str(
-            Path(os.environ.get("ProgramFiles", "C:/Program Files"))
-            / "Git/usr/bin/openssl.exe"
+            Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/usr/bin/openssl.exe"
         )
     args = [
         executable,
@@ -115,9 +114,7 @@ def crypt(raw, key, *, decrypt=False):
             raise SnapshotError("Invalid snapshot encryption key")
         env = os.environ.copy()
         env["GOVBIZ_SNAPSHOT_KEY"] = key.rstrip(b"\n").decode("ascii")
-        return run(
-            args + ["-pass", "env:GOVBIZ_SNAPSHOT_KEY"], data=raw, env=env, timeout=60
-        )
+        return run(args + ["-pass", "env:GOVBIZ_SNAPSHOT_KEY"], data=raw, env=env, timeout=60)
     # On Linux, pass the password over a pipe, never argv or a plaintext file.
     reader, writer = os.pipe()
     try:

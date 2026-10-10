@@ -7,6 +7,7 @@ import { useChatPageViewModel } from '../viewmodel/useChatPageViewModel'
 import { companyConditionFields } from '../viewmodel/chatConversationProposal'
 import { ConversationProposal } from './ConversationProposal'
 import { ProgramResults } from './ProgramResults'
+import { EvidenceQuestionFeedback } from '../../support-program-detail/view/EvidenceQuestionFeedback'
 import { SearchIntroTitle } from './SearchIntroTitle'
 import type { ChatSearchOptions } from '../state/chatSlice'
 import {
@@ -20,6 +21,10 @@ export type ChatPageLayout = 'landing' | 'workspace'
 
 export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
   const {
+    isGovAgent,
+    govProgram,
+    selectGovProgram,
+    evidenceUsage,
     isRestoredHistory,
     displayProposal,
     interpretationError,
@@ -112,7 +117,7 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onKeyDown={handleInputKeyDown}
-          placeholder={isLandingIntro
+          placeholder={isGovAgent ? '지원사업을 찾거나 선택한 공고에 대해 질문해 주세요.' : isLandingIntro
             ? '예: 서울에서 AI 서비스를 만드는 창업기업입니다. 사업화 지원을 받을 수 있을까요?'
             : isDockedLanding ? '지원사업·조건을 입력해 주세요.'
               : '찾고 싶은 지원사업이나 변경할 조건을 알려주세요.'}
@@ -218,12 +223,18 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
               <div className={`${isGuest ? (isUser ? chatPageStyles.guestUserBubble : chatPageStyles.guestAssistantBubble) : chatMessageBubbleClassName(isUser)} ${message.failure ? chatPageStyles.failureMessageBubble : ''}`}>
                 {message.failure ? (
                   <p className="m-0" role={isCurrentFailure ? 'alert' : undefined}>{message.text}</p>
-                ) : message.text}
+                ) : message.govEvidence ? <>
+                  <p className="mb-2 text-sm font-semibold">{message.govEvidence.program.title}</p>
+                  <EvidenceQuestionFeedback compact state={message.govEvidence.answer.answerStatus === 'ANSWERED'
+                    ? { status: 'answered', answer: message.govEvidence.answer } : { status: 'insufficient-evidence' }} />
+                </> : isGovAgent && index === 0
+                  ? '안녕하세요. Gov 에이전트입니다. 지원사업을 검색하고, 결과에서 공고를 선택하면 같은 대화에서 원문 근거로 답변해 드립니다.'
+                  : message.text}
                 {retrySearch || retryInterpretation ? (
                   <div className={chatPageStyles.messageActions}>
                     <button type="button" className={chatPageStyles.messageRetryButton}
                       onClick={retrySearch ? handleRetrySearch : handleRetryInterpretation}>
-                      {retrySearch ? '다시 검색' : '다시 해석'}
+                      {retrySearch ? '다시 검색' : isGovAgent ? '다시 요청' : '다시 해석'}
                     </button>
                   </div>
                 ) : null}
@@ -250,7 +261,11 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
                 </div>
               ) : null}
               {message.programs?.length ? (
-                <ProgramResults programs={message.programs} totalCount={message.totalCount} resultToken={message.resultToken} interests={interests} />
+                <ProgramResults programs={message.programs} totalCount={message.totalCount} resultToken={message.resultToken} interests={interests}
+                  onSelectProgram={isGovAgent && !isBusy ? (program) => {
+                    selectGovProgram({ sourceCode: program.sourceCode, sourceProgramId: program.id, title: program.title })
+                    composerInputRef.current?.focus()
+                  } : undefined} />
               ) : null}
             </div>
           </article>
@@ -260,9 +275,9 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
         <div className={chatPageStyles.messageRow}>
           {!isGuest ? <span className={chatPageStyles.assistantAvatar}>G</span> : null}
           <div className={chatPageStyles.searchingBubble} role="group"
-            aria-label={isInterpreting ? '조건 해석 진행 중' : '지원사업 검색 진행 중'}>
+            aria-label={isInterpreting ? isGovAgent ? 'Gov 에이전트 처리 중' : '조건 해석 진행 중' : '지원사업 검색 진행 중'}>
             <div className={chatPageStyles.loadingHeader}>
-              <strong className={chatPageStyles.loadingLabel}>{isInterpreting ? '조건 해석 중' : '지원사업 검색 중'}</strong>
+              <strong className={chatPageStyles.loadingLabel}>{isInterpreting ? isGovAgent ? 'Gov 에이전트 처리 중' : '조건 해석 중' : '지원사업 검색 중'}</strong>
               <span className={chatPageStyles.loadingDots} aria-hidden="true">
                 {[0, 160, 320].map((delay) => (
                   <span key={delay} className={chatPageStyles.loadingDot} style={{ animationDelay: `${delay}ms` }} />
@@ -270,7 +285,7 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
               </span>
             </div>
             <p className={chatPageStyles.loadingDescription}>
-              {isInterpreting ? '조건 변경안을 해석하고 있어요. 아직 검색하지 않았습니다…' : '공고를 찾아보고 있어요…'}
+              {isInterpreting ? isGovAgent ? '요청에 맞는 기능으로 처리하고 있어요…' : '조건 변경안을 해석하고 있어요. 아직 검색하지 않았습니다…' : '공고를 찾아보고 있어요…'}
             </p>
             <div className={chatPageStyles.loadingTrack} aria-hidden="true">
               <span className={chatPageStyles.loadingSweep} />
@@ -299,10 +314,17 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
     // 로그인 뒤의 작업 화면은 대화와 하단 입력창으로 구성합니다.
     return (
       <main className={chatPageStyles.workspacePage}>
-        <h1 className="sr-only">지원사업 채팅</h1>
+        <h1 className="sr-only">{isGovAgent ? 'Gov 에이전트' : '지원사업 채팅'}</h1>
         <section className={chatPageStyles.workspaceShell}>
           {timeline}
           <form className={chatPageStyles.composerWorkspace} onSubmit={handleSubmit}>
+            {isGovAgent ? <div className="px-3 py-2 text-sm text-ink-muted">
+              {govProgram ? <div className="flex items-center justify-between gap-3 rounded-xl bg-brand-soft p-3">
+                <span>질문할 공고: <strong className="text-ink">{govProgram.title}</strong></span>
+                <button type="button" disabled={isBusy} className="shrink-0 underline" onClick={() => selectGovProgram(null)}>선택 해제</button>
+              </div> : <p>검색 결과의 ‘이 공고 질문’으로 원문 답변을 이어갈 수 있습니다.</p>}
+              {evidenceUsage ? <PlanUsageLine view={evidenceUsage} className="mt-2" /> : null}
+            </div> : null}
             {readinessNotice}
             {composerInputGroup}
             {composerErrors}

@@ -3,7 +3,6 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { screenTitles } from '../routes/screenTitles'
 
 // 탭 이름은 브라우저 제목과 같은 화면 이름입니다.
-const searchModeTabLabels = [screenTitles.aiSearch, screenTitles.filterSearch] as const
 
 /**
  * 로그인 뒤 작업 화면에서 검색 탭을 담는 줄입니다. 다른 작업 화면의 머리글처럼 위에 붙고 본문은 작업 칸과 함께 스크롤됩니다.
@@ -17,11 +16,13 @@ export function WorkspaceSearchTabsRow({ children }: { children: ReactNode }) {
  * 검색 화면 위의 가로 검색 탭입니다. 검색 화면에서는 아래 패널을 바꾸고, 공고 상세·원문 질문 화면에서는 같은 자리에 남아
  * 누르면 그 검색 화면으로 돌아갑니다. [controlsPanels]가 참일 때만 탭이 패널 id를 가리킵니다.
  */
-export function SearchModeTabs({ isFilter, onSelect, controlsPanels = true }: {
+export function SearchModeTabs({ isFilter, onSelect, controlsPanels = true, isGovAgent = false }: {
   isFilter: boolean
   onSelect: (filter: boolean) => void
   controlsPanels?: boolean
+  isGovAgent?: boolean
 }) {
+  const searchModeTabLabels = [isGovAgent ? screenTitles.govAgent : screenTitles.aiSearch, screenTitles.filterSearch]
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   const handleKey = (event: KeyboardEvent, index: number) => {
     const target = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : ['ArrowRight', 'ArrowLeft'].includes(event.key) ? 1 - index : null

@@ -25,6 +25,7 @@ from app.config import Settings
 from app.support_program_index.service import SupportProgramIndexService
 from app.support_program_conversation.agent import SupportProgramConversationAgent
 from app.support_program_conversation.service import SupportProgramConversationService
+from app.gov_agent.agent import GovAgentSupervisor
 
 
 @dataclass(slots=True)
@@ -44,6 +45,7 @@ class ApplicationContainer:
     assistant_agent_service: AssistantAgentService | None = None
     assistant_tool_client: CoreToolClient | None = None
     llm_tracing: LLMTracing | None = None
+    gov_agent_supervisor: GovAgentSupervisor | None = None
 
     async def close(self) -> None:
         try:
@@ -202,6 +204,10 @@ def build_application_container(
         application_preparation_service=ApplicationPreparationService(application_preparation_agent, settings.openai_model),
         support_program_ranking_service=SupportProgramRankingService(ranking_agent, tracing=llm_tracing),
         support_program_conversation_service=SupportProgramConversationService(conversation_agent),
+        gov_agent_supervisor=GovAgentSupervisor(
+            model=_chat_model(settings, settings.openai_assistant_model, "none"),
+            timeout_seconds=settings.llm_model_timeout_seconds,
+        ),
         assistant_service=AssistantService(assistant_agent),
         assistant_agent_service=assistant_agent_service,
         assistant_tool_client=assistant_tool_client,

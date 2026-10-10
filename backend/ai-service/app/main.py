@@ -12,6 +12,7 @@ from app.assistant_agent.router import router as assistant_agent_router
 from app.assistant_agent.service import AssistantAgentService
 
 from app.health.router import router as health_router
+from app.gov_agent.router import router as gov_agent_router
 from app.support_program_evidence.agent import SupportProgramEvidenceAnswerAgent
 from app.support_program_evidence.router import router as support_program_evidence_router
 from app.support_program_ranking.agent import SupportProgramRecommendationAgent
@@ -68,6 +69,7 @@ def create_app(
     )
     application.state.container = container
     application.include_router(health_router)
+    application.include_router(gov_agent_router)
     application.include_router(combination_review_router)
     application.include_router(application_preparation_router)
     application.include_router(support_program_rankings_router)

@@ -8,6 +8,7 @@ import { appPaths, publicPaths } from './appPaths'
  */
 export const screenTitles = {
   aiSearch: 'AI 대화 검색',
+  govAgent: 'Gov 에이전트',
   filterSearch: '필터 검색',
   pricing: '요금제',
   publicPartners: '파트너 모집',
@@ -87,16 +88,17 @@ const routeTitles: readonly (readonly [pattern: string, title: string])[] = [
 ]
 
 /** 주소의 화면 이름입니다. 검색 화면(`/`, `/app/chat`)은 `?mode=filter`면 필터 검색, 아니면 AI 검색입니다. 모르는 주소면 null입니다. */
-export function screenTitleFor(pathname: string, search = ''): string | null {
+export function screenTitleFor(pathname: string, search = '', isAdmin = false): string | null {
   const path = pathname.replace(/\/+$/, '') || publicPaths.landing
   if (path === publicPaths.landing || path === appPaths.chat) {
-    return new URLSearchParams(search).get('mode') === 'filter' ? screenTitles.filterSearch : screenTitles.aiSearch
+    return new URLSearchParams(search).get('mode') === 'filter' ? screenTitles.filterSearch
+      : isAdmin && path === appPaths.chat ? screenTitles.govAgent : screenTitles.aiSearch
   }
   return routeTitles.find(([pattern]) => matchPath(pattern, path) !== null)?.[1] ?? null
 }
 
 /** 브라우저 제목입니다. "관심 공고함 · GovBiz"처럼 화면 이름을 앞에 두고, 이름이 없는 주소는 "GovBiz"만 씁니다. */
-export function documentTitleFor(pathname: string, search = ''): string {
-  const title = screenTitleFor(pathname, search)
+export function documentTitleFor(pathname: string, search = '', isAdmin = false): string {
+  const title = screenTitleFor(pathname, search, isAdmin)
   return title === null ? 'GovBiz' : `${title} · GovBiz`
 }

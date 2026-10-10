@@ -26,6 +26,7 @@ export function useChatPageViewModel() {
   // AI 대화 검색 이용량입니다. 못 읽으면 줄을 그리지 않고 막지도 않습니다(서버가 다시 판단).
   const planUsage = usePlanUsage()
   const aiSearchUsage = planUsageView(planUsage.usage, 'AI_SEARCH')
+  const evidenceUsage = planUsageView(planUsage.usage, 'EVIDENCE_QUESTION')
   // 한도를 다 쓰면 검색 실행(이 조건으로 검색 · 다시 검색)만 막습니다. 메시지 해석과 필터 검색은 이용량에 들지 않습니다.
   const searchLimitMessage = aiSearchUsage?.isLimitReached ? aiSearchUsage.limitMessage : null
   const displayProposal = createChatConversationProposal({
@@ -50,7 +51,7 @@ export function useChatPageViewModel() {
     isSearching: chat.isSearching,
   })
   const searchStatusAnnouncement = useMemo(() => chat.isInterpreting
-    ? '메시지의 조건 변경을 해석하고 있습니다. 아직 검색하지 않았습니다.'
+    ? chat.isGovAgent ? 'Gov 에이전트가 요청을 처리하고 있습니다.' : '메시지의 조건 변경을 해석하고 있습니다. 아직 검색하지 않았습니다.'
     : chat.interpretation.status === 'ready'
       ? '조건 변경안이 준비되었습니다. 확인 버튼을 눌러야 검색합니다.'
       : chat.interpretation.status === 'clarification'
@@ -61,7 +62,7 @@ export function useChatPageViewModel() {
       ? latestMessage.totalCount !== undefined && latestMessage.totalCount > latestMessage.programs.length
         ? `지원사업 검색 결과 ${latestMessage.totalCount}건 중 ${latestMessage.programs.length}건을 표시했습니다. 표시된 공고: ${formatSupportProgramEligibilityCounts(latestMessage.programs)}. 추가 ${latestMessage.totalCount - latestMessage.programs.length}건은 회원가입 또는 로그인 후 확인할 수 있습니다.`
         : `지원사업 검색 결과 ${latestMessage.programs.length}건: ${formatSupportProgramEligibilityCounts(latestMessage.programs)}을 표시했습니다.`
-      : '', [chat.isInterpreting, chat.interpretation.status, chat.interpretation.result?.clarificationQuestion,
+      : '', [chat.isGovAgent, chat.isInterpreting, chat.interpretation.status, chat.interpretation.result?.clarificationQuestion,
         chat.isSearching, latestMessage])
 
   useEffect(() => {
@@ -108,6 +109,11 @@ export function useChatPageViewModel() {
   // 검색을 한 번 시도하면(성공 · 한도 초과 · 실패 · 시간 초과 · 취소) 이용량을 다시 읽습니다.
   const wasSearching = useRef(chat.isSearching)
   const reloadPlanUsage = planUsage.reload
+  const wasGovBusy = useRef(false)
+  useEffect(() => {
+    if (wasGovBusy.current && !chat.isInterpreting) reloadPlanUsage()
+    wasGovBusy.current = chat.isGovAgent && chat.isInterpreting
+  }, [chat.isGovAgent, chat.isInterpreting, reloadPlanUsage])
   useEffect(() => {
     if (wasSearching.current && !chat.isSearching) reloadPlanUsage()
     wasSearching.current = chat.isSearching
@@ -179,6 +185,10 @@ export function useChatPageViewModel() {
   }
 
   return {
+    isGovAgent: chat.isGovAgent,
+    govProgram: chat.govProgram,
+    selectGovProgram: chat.selectGovProgram,
+    evidenceUsage,
     isRestoredHistory: chat.isRestoredHistory,
     displayProposal,
     hasConfirmedSearch,

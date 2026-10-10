@@ -333,6 +333,24 @@ AI Service는 호스트에 포트를 게시하지 않습니다. MySQL·Qdrant·C
 `127.0.0.1`에 바인딩합니다. 기업마당·K-Startup 키는 Core API에, OpenAI 키는 AI Service에만 주입합니다.
 이는 개발 환경의 서비스 배치이며 운영 인증·접근 제어가 구현됐다는 의미는 아닙니다.
 
+## 관리자 Gov 에이전트
+
+웹 관리자의 `/app/chat`은 Gov 에이전트로 표시하며 일반 회원의 기존 AI 대화 검색은 유지합니다.
+`ChatPage → 기존 chat Redux 요청 수명 관리 → shared GovAgent API → Core AdminPrincipal → GovAgentService →
+AiGovAgentClient → AI GovAgentSupervisor → OpenAI`가 한 턴의 위임 경로를 정합니다.
+Core는 `SEARCH`이면 기존 조건 해석 Service로 제안을 준비하고 사용자의 확인 후 기존 검색 API가 실행되게 합니다.
+`EVIDENCE`이면 사용자가 고른 `(sourceCode, sourceProgramId)`와 원래 질문으로 기존 사용량 경계·원문 RAG를 호출합니다.
+선택하지 않은 상태는 선택 안내, 미지원 기능은 미지원 안내를 반환하며 임의의 공고·도구를 추정해 실행하지 않습니다.
+
+클라이언트는 응답의 공고 식별자가 요청과 같은지, 인용이 공식 제공처 URL인지 확인한 뒤 기존 원문 답변 컴포넌트로 보여 줍니다.
+`schemaVersion: 1` 대화 스냅샷에 선택 공고 `govProgram`과 메시지의 `govEvidence`를 선택 필드로 보관합니다.
+이전 기록과 일반 회원은 호환되며 열기만으로 AI를 호출하지 않습니다. 새 검색은 이전 선택을 해제하고,
+새 대화·계정 변경·취소 뒤 도착한 응답은 기존 요청 ID와 AbortController로 폐기합니다.
+이 기록은 화면 데이터이며 관리자 권한이나 서버 검증을 대신하지 않습니다.
+
+이 단계는 검색·원문 질문의 단일 작업 위임입니다. 모든 AI 기능 통합, 신청서 생성·중복 검토 작업 ID를 이용한 재개,
+여러 단계 계획의 자동 실행은 후속 범위입니다. 기존 역할이 있는 Service를 직접 재사용하며 A2A나 별도 Agent 실행 계층은 추가하지 않습니다.
+
 ## 로그인 회원의 대화 기록
 
 `WorkspaceLayout/useChatHistory → ChatConversationUseCase → ChatConversationRepository → data/api →
