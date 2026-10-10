@@ -90,24 +90,40 @@ def key_bytes(path):
 
 
 def crypt(raw, key, *, decrypt=False):
-    # Pass the high-entropy password over a pipe, not argv or a temporary plaintext file.
+    executable = "openssl"
+    if os.name == "nt":
+        executable = str(
+            Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+            / "Git/usr/bin/openssl.exe"
+        )
+    args = [
+        executable,
+        "enc",
+        "-aes-256-cbc",
+        "-pbkdf2",
+        "-iter",
+        "210000",
+        "-md",
+        "sha256",
+    ]
+    if decrypt:
+        args.append("-d")
+    if os.name == "nt":
+        # Windows cannot pass POSIX file descriptors. Keep the high-entropy key
+        # in this short-lived child's environment, never argv or a plaintext file.
+        if not re.fullmatch(rb"[a-f0-9]{64}\n?", key):
+            raise SnapshotError("Invalid snapshot encryption key")
+        env = os.environ.copy()
+        env["GOVBIZ_SNAPSHOT_KEY"] = key.rstrip(b"\n").decode("ascii")
+        return run(
+            args + ["-pass", "env:GOVBIZ_SNAPSHOT_KEY"], data=raw, env=env, timeout=60
+        )
+    # On Linux, pass the password over a pipe, never argv or a plaintext file.
     reader, writer = os.pipe()
     try:
         os.write(writer, key)
         os.close(writer)
         writer = None
-        args = [
-            "openssl",
-            "enc",
-            "-aes-256-cbc",
-            "-pbkdf2",
-            "-iter",
-            "210000",
-            "-md",
-            "sha256",
-        ]
-        if decrypt:
-            args.append("-d")
         args += ["-pass", f"fd:{reader}"]
         try:
             return subprocess.run(

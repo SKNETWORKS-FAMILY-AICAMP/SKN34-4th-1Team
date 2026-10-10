@@ -4,7 +4,8 @@
 Compose는 로컬 개발에 유지하고, 이전 중에는 기존 인스턴스와 원본 데이터를 보존한다.
 개인 환경의 Prefect·실행기·결과 서버는 2026-10-10에 Kubernetes로 실제 이전했다.
 같은 날 [Langfuse와 전용 저장소도 실제 이전](langfuse-kubernetes.md)했고, 실행기는 내부 Langfuse
-Service를 사용한다. 전체 Argo Application은 8개, 원본 Compose 중지 대상은 9개다.
+Service를 사용한다. 2026-10-11 웹 배포까지 전체 Argo Application은 9개이며,
+이전한 평가·관측의 원본 Compose 중지 대상은 9개다.
 개인 환경의 이 전환과 웹·운영 데이터·외부 접근을 포함한 전체 이전 완료는 구분하며,
 [전체 Kubernetes 배포 기준](../README.md#최종-배포-목표와-완료-기준)을 적용한다.
 
