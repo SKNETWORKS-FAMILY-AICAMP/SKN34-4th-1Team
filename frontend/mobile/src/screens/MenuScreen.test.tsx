@@ -14,6 +14,17 @@ const auth = (account: { email: string; company: { companyName: string } | null 
 }
 beforeEach(() => { auth(null); jest.mocked(clearIntroductionCompleted).mockReset().mockResolvedValue(undefined) })
 
+test('mobile assistant entry is offered only to a signed-in account', () => {
+  const open = jest.fn(), view = render(<MenuScreen onOpen={open} />)
+  expect(screen.queryByLabelText('GovBiz 도우미')).toBeNull()
+  auth({ email: 'owner@example.test', company: null })
+  view.rerender(<MenuScreen onOpen={open} />)
+  fireEvent.press(screen.getByLabelText('GovBiz 도우미'))
+  expect(open).toHaveBeenCalledWith('assistant')
+  auth(null); view.rerender(<MenuScreen onOpen={open} />)
+  expect(screen.queryByLabelText('GovBiz 도우미')).toBeNull()
+})
+
 test('policy drafts and help can be opened before login without requesting an account destination', () => {
   const open = jest.fn()
   render(<MenuScreen onOpen={open} />)

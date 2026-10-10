@@ -20,15 +20,17 @@ import { AppIcon } from '../components/AppIcon'
 import { PartnerSheet } from '../components/PartnerSheet'
 import type { SearchProgramInterests } from '../components/SearchProgramInterests'
 import { PlanUsageLine, usePlanUsage } from '../components/PlanUsage'
+import type { AssistantDraft } from '../assistant/context'
 import { Button, Notice, colors, styles } from '../ui'
 
 import { chatSearchOptions, chatSnapshot, contextFromSearch, emptyChatContext as emptyContext } from './chatConversationState'
 
 type TimelineTarget = 'message' | 'waiting' | 'answer' | 'proposal' | 'results' | 'notice'
 
-export function ChatScreen({ onOpenProgram, onLogin, keyboardOffset = 0, active = true, interests }: {
+export function ChatScreen({ onOpenProgram, onLogin, keyboardOffset = 0, active = true, interests, assistantDraft, onDraftConsumed }: {
   onOpenProgram: (identity: SupportProgramIdentity) => void; onLogin: (request?: LoginRequest) => void; keyboardOffset?: number; active?: boolean
   interests?: SearchProgramInterests
+  assistantDraft?: AssistantDraft | null; onDraftConsumed?(id: string): void
 }) {
   const { session, status, invalidateSession } = useAuth()
   const composerInput = useRef<TextInput>(null)
@@ -68,6 +70,8 @@ export function ChatScreen({ onOpenProgram, onLogin, keyboardOffset = 0, active 
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
   const previousToken = useRef(token)
+  const draftOwner = useRef(token); draftOwner.current = token
+  const consumedDraft = useRef<string | null>(null)
   const pendingRestore = useRef<{ resultToken: string; context: SupportProgramConversationContext; history: typeof history } | null>(null)
   const retryRestore = useRef<typeof pendingRestore.current>(null)
   const [restoreFailure, setRestoreFailure] = useState<'expired' | 'unavailable' | null>(null)
@@ -142,6 +146,7 @@ export function ChatScreen({ onOpenProgram, onLogin, keyboardOffset = 0, active 
     generation.current += 1
     request.current?.abort(); historyWork.current?.abort()
     conversationVersion.current = 0; unsavedSnapshot.current = null
+    consumedDraft.current = null
     deletionId.current = null; setDeletingRecord(null); setDeleteError(null)
     setSavingHistory(false); setHistoryError(null); setRecordsOpen(false); setRecords([]); setRecordsCursor(null); setLoadingRecords(false); setRecordsError(null); setHistoryRestored(false)
     setMessage(''); setContext(emptyContext); setProposal(null); setClarification(null); setResult(null)
@@ -151,6 +156,17 @@ export function ChatScreen({ onOpenProgram, onLogin, keyboardOffset = 0, active 
     if (selected && token) void restore(selected, token)
     return () => { generation.current += 1; request.current?.abort(); historyWork.current?.abort(); clearTimelineScroll() }
   }, [token])
+
+  useEffect(() => {
+    if (!token || !active || !assistantDraft || consumedDraft.current === assistantDraft.id || busy || savingHistory || loadingRecords) return
+    consumedDraft.current = assistantDraft.id
+    const apply = () => { if (draftOwner.current === token) { setMessage(assistantDraft.text); composerInput.current?.focus() } }
+    if (message.trim() && message !== assistantDraft.text) Alert.alert('입력 중인 검색어를 바꿀까요?', '도우미가 준비한 검색어를 입력할 수 있어요. 검색은 직접 전송한 뒤 실행됩니다.', [
+      { text: '현재 입력 유지', style: 'cancel', onPress: () => onDraftConsumed?.(assistantDraft.id) },
+      { text: '도우미 검색어 사용', onPress: () => { apply(); onDraftConsumed?.(assistantDraft.id) } },
+    ])
+    else { apply(); onDraftConsumed?.(assistantDraft.id) }
+  }, [token, active, assistantDraft, busy, savingHistory, loadingRecords, message, onDraftConsumed])
 
   async function persist(snapshot: ChatConversationSnapshot) {
     if (!token || !email || deletionId.current) return

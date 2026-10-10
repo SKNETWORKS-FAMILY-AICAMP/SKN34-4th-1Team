@@ -9,7 +9,7 @@ import { ServiceInformationSheet } from '../components/ServiceInformationSheet'
 import { serviceContact, serviceInformation, type ServiceInformationSection } from '../content/serviceInformation'
 
 export type MenuDestination = 'account' | 'company' | 'settings' | 'filter' | 'ai' | 'saved' | 'report'
-  | 'partners' | 'documents' | 'reviews' | 'recruitments' | 'received' | 'sent' | 'mine' | 'pricing'
+  | 'partners' | 'documents' | 'reviews' | 'recruitments' | 'received' | 'sent' | 'mine' | 'pricing' | 'assistant'
 type MenuItem = { destination: MenuDestination | ServiceInformationSection; label: string; description: string; icon: AppIconName }
 
 export function MenuScreen({ onOpen }: { onOpen(destination: MenuDestination): void }) {
@@ -53,6 +53,7 @@ export function MenuScreen({ onOpen }: { onOpen(destination: MenuDestination): v
       { destination: 'partners', label: '파트너 관리', description: '제안 · 내 모집글', icon: 'collaboration' },
     ] },
     { title: '서비스 안내', items: [
+      ...(account ? [{ destination: 'assistant' as const, label: 'GovBiz 도우미', description: '사용법 · 질문하기', icon: 'message' as const }] : []),
       { destination: 'pricing', label: '요금제', description: '기능 · 이용 안내', icon: 'creditCard' },
       { destination: 'privacy', label: '개인정보 처리방침', description: serviceInformation.privacy.preparing ? '문서 초안' : '문서 읽기', icon: 'document' },
       { destination: 'terms', label: '이용약관', description: serviceInformation.terms.preparing ? '문서 초안' : '문서 읽기', icon: 'document' },

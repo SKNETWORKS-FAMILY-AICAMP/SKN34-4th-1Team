@@ -2,12 +2,14 @@ import type { PropsWithChildren, ReactNode } from 'react'
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../ui'
+import { useAssistantBlock } from '../assistant/context'
 
 /** 공용 네이티브 시트. 배경을 투명하게 표시해도 바깥 영역을 누르면 닫힙니다. */
 export function PartnerSheet({ visible, title, onClose, children, actions, dimBackdrop = true, compact = false, bottomSafeArea = true }: PropsWithChildren<{
   visible: boolean; title: string; onClose(): void; actions: ReactNode; dimBackdrop?: boolean; compact?: boolean; bottomSafeArea?: boolean
 }>) {
   const insets = useSafeAreaInsets()
+  useAssistantBlock(visible)
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[local.overlay, !dimBackdrop && local.transparentOverlay]}>
       <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="시트 닫기" onPress={onClose} />

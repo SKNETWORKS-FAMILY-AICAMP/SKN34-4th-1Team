@@ -45,6 +45,28 @@ beforeEach(() => {
 })
 afterEach(() => jest.restoreAllMocks())
 
+test('assistant handoff opens the selected program question with a draft and no AI request', async () => {
+  const consumed = jest.fn()
+  render(<ProgramScreen identity={identity} onLogin={jest.fn()} assistantDraft={{ id: 'assistant-question-1', text: '우리 회사도 신청할 수 있나요?' }} onDraftConsumed={consumed} />)
+  await screen.findByLabelText('공고에 대해 궁금한 점')
+  await act(async () => undefined)
+  expect(screen.getByLabelText('공고에 대해 궁금한 점').props.value).toBe('우리 회사도 신청할 수 있나요?')
+  expect(consumed).toHaveBeenCalledWith('assistant-question-1')
+  expect(answer).not.toHaveBeenCalled()
+}, 15_000)
+
+test('a guided assistant open preserves an existing question and never submits it', async () => {
+  const consumed = jest.fn(), props = { identity, onLogin: jest.fn(), onDraftConsumed: consumed }
+  const view = render(<ProgramScreen {...props} />)
+  await screen.findByLabelText('원문에 질문하기')
+  await act(async () => fireEvent.press(screen.getByLabelText('원문에 질문하기')))
+  fireEvent.changeText(screen.getByLabelText('공고에 대해 궁금한 점'), '직접 작성한 질문')
+  await act(async () => view.rerender(<ProgramScreen {...props} assistantDraft={{ id: 'guided-open', text: '' }} />))
+  expect(screen.getByLabelText('공고에 대해 궁금한 점').props.value).toBe('직접 작성한 질문')
+  expect(consumed).toHaveBeenCalledWith('guided-open')
+  expect(answer).not.toHaveBeenCalled()
+}, 15_000)
+
 // Windows에서 첫 React Native 렌더링의 모듈 초기화가 기본 5초를 넘는 경우를 허용합니다.
 test.each(['signedOut', 'signedIn'] as const)('program information and its official source are immediately available to %s', async (status) => {
   if (status === 'signedOut') jest.mocked(useAuth).mockReturnValue({ status, session: null, invalidateSession } as unknown as ReturnType<typeof useAuth>)

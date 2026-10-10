@@ -2,13 +2,16 @@ import { useRouter } from 'expo-router'
 import { MenuScreen, type MenuDestination } from '../../../src/screens/MenuScreen'
 import { useAuth } from '../../../src/auth/session'
 import { useLoginFlow } from '../../../src/auth/loginFlow'
+import { useAssistant } from '../../../src/assistant/context'
 
 export default function MenuRoute() {
   const router = useRouter()
   const { status } = useAuth()
   const requestLogin = useLoginFlow()
+  const assistant = useAssistant()
   function navigate(destination: MenuDestination, signedIn: boolean) {
     switch (destination) {
+      case 'assistant': assistant.open(); break
       case 'account': router.push('/(tabs)/all/account'); break
       case 'company': router.push('/(tabs)/all/company'); break
       case 'settings': router.push('/(tabs)/all/settings'); break
