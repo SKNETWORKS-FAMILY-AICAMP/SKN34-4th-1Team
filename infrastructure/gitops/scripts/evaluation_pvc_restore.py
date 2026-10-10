@@ -509,6 +509,8 @@ def restored_pvcs(kube, node, stores, expected, *, image=None, retain=False):
                 current = run(kube + ["get", "namespace", namespace, "-o", "json"])
                 require_owner(current, namespace, token, uid)
                 cleanup_stage = "namespace_delete"
+                # Runtime Pods have a 120s termination grace. Namespace deletion
+                # must also allow the PVC-protection controller to release claims.
                 snapshot.storage.run(
                     [
                         str(p)
@@ -518,10 +520,10 @@ def restored_pvcs(kube, node, stores, expected, *, image=None, retain=False):
                             "namespace",
                             namespace,
                             "--wait=true",
-                            "--timeout=120s",
+                            "--timeout=240s",
                         ]
                     ],
-                    timeout=135,
+                    timeout=255,
                 )
                 cleanup_stage = "volume_deletion_wait"
                 for name in pv_names:
