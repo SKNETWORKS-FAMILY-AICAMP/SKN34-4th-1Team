@@ -1,4 +1,5 @@
 import { browseSupportProgramsApi } from './supportProgramCatalogApi'
+import { sendGovAgentMessageApi } from './govAgentApi'
 import {
   answerSupportProgramEvidenceQuestionApi,
   getSupportProgramAttachmentsApi,
@@ -39,6 +40,7 @@ export function createSupportProgramClient(options: SupportProgramClientOptions)
   }
 
   return {
+    sendGovAgentMessage: sendGovAgentMessageApi.bind(null, context),
     browseCatalog: browseSupportProgramsApi.bind(null, context),
     getDetail: getSupportProgramDetailApi.bind(null, context),
     getAttachments: getSupportProgramAttachmentsApi.bind(null, context),

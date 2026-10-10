@@ -10,11 +10,12 @@ import { searchResultInterestKey, searchResultInterestMessages, type SearchResul
 import { chatPageStyles } from './ChatPage.styles'
 
 // 초안 입력 중에도 Redux가 보존하는 검색 결과 배열은 카드 전체를 다시 렌더하지 않습니다.
-export const ProgramResults = memo(function ProgramResults({ programs, totalCount = programs.length, resultToken = null, interests = null }: {
+export const ProgramResults = memo(function ProgramResults({ programs, totalCount = programs.length, resultToken = null, interests = null, onSelectProgram }: {
   programs: SupportProgram[]
   totalCount?: number
   resultToken?: string | null
   interests?: SearchResultInterests | null
+  onSelectProgram?: (program: SupportProgram) => void
 }) {
   const lockedCount = resultToken ? Math.max(0, totalCount - programs.length) : 0
   const returnTo = `${appPaths.chat}?searchResult=${encodeURIComponent(resultToken ?? '')}`
@@ -30,7 +31,7 @@ export const ProgramResults = memo(function ProgramResults({ programs, totalCoun
       ) : null}
       <div className={chatPageStyles.programList}>
         {programs.map((program) => (
-          <ProgramCard key={searchResultInterestKey({ sourceCode: program.sourceCode, sourceProgramId: program.id })} program={program} interests={interests} />
+          <ProgramCard key={searchResultInterestKey({ sourceCode: program.sourceCode, sourceProgramId: program.id })} program={program} interests={interests} onSelectProgram={onSelectProgram} />
         ))}
       </div>
       {lockedCount > 0 ? (
@@ -74,7 +75,7 @@ export const ProgramResults = memo(function ProgramResults({ programs, totalCoun
   )
 })
 
-function ProgramCard({ program, interests }: { program: SupportProgram; interests: SearchResultInterests | null }) {
+function ProgramCard({ program, interests, onSelectProgram }: { program: SupportProgram; interests: SearchResultInterests | null; onSelectProgram?: (program: SupportProgram) => void }) {
   const { pathname } = useLocation()
   const inApp = isAppPath(pathname)
   const searchReturnTo = inApp ? appPaths.chat : '/'
@@ -148,6 +149,8 @@ function ProgramCard({ program, interests }: { program: SupportProgram; interest
       ) : null}
       {/* 왼쪽은 새 창으로 여는 원문 링크(새 창 아이콘), 오른쪽은 상세 조건 보기입니다. */}
       <div className={chatPageStyles.programActions}>
+        {onSelectProgram ? <button type="button" className={chatPageStyles.programDetailsButton}
+          onClick={() => onSelectProgram(program)}>이 공고 질문</button> : null}
         <a
           href={program.sourceUrl}
           target="_blank"

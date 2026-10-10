@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { useSearchParams } from 'react-router'
 
-import { useAppDispatch } from '../../../../app/hooks'
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks'
 import { GuestSearchLayout } from '../../../shared/support-program/GuestSearchLayout'
 import { SearchModeTabs, WorkspaceSearchTabsRow } from '../../../shared/support-program/SearchModeTabs'
 import { conversationReset } from '../../chat/state/chatSlice'
@@ -13,6 +13,7 @@ import { SupportProgramCatalogPanel } from './SupportProgramCatalogPanel'
 export function SupportProgramSearchPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
   const [params, setParams] = useSearchParams()
   const dispatch = useAppDispatch()
+  const isGovAgent = useAppSelector((state) => layout === 'workspace' && state.auth.status === 'authenticated' && state.auth.account?.role === 'ADMIN')
   const contentRef = useRef<HTMLDivElement>(null)
   const isFilter = params.get('mode') === 'filter'
   const isGuest = layout === 'landing'
@@ -30,7 +31,7 @@ export function SupportProgramSearchPage({ layout = 'landing' }: { layout?: Chat
     })
     contentRef.current?.querySelector<HTMLTextAreaElement>('textarea[aria-label="지원사업 검색어"]')?.focus()
   }
-  const searchTabs = <SearchModeTabs isFilter={isFilter} onSelect={select} />
+  const searchTabs = <SearchModeTabs isFilter={isFilter} onSelect={select} isGovAgent={isGovAgent} />
   // 스크롤은 껍데기(로그인은 작업 칸, 비로그인은 문서)가 맡으므로 패널 안에는 스크롤 영역을 두지 않습니다.
   const panels = <div ref={contentRef} className="flex min-w-0 flex-1 flex-col">
     <div role="tabpanel" id="search-panel-0" aria-labelledby="search-tab-0" hidden={isFilter} className={isFilter ? 'hidden' : 'flex flex-1 flex-col'}>

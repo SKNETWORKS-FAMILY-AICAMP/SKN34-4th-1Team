@@ -1,4 +1,5 @@
 import { createSelector, createSlice, nanoid, type PayloadAction } from '@reduxjs/toolkit'
+import type { GovAgentEvidence, GovAgentProgram } from '@govbiz/shared/domain/entities/GovAgent'
 
 import type { RootState } from '../../../../app/store'
 import type { ChatConversationSnapshot, ChatMessage, ChatSearchOptions } from '../../../../domain/entities/ChatConversation'
@@ -30,6 +31,7 @@ type ChatInterpretation = {
 }
 
 type ChatState = {
+  govProgram: GovAgentProgram | null
   companyDefaultsInitialized: boolean
   accountEmail: string | null
   isRestoredHistory: boolean
@@ -124,6 +126,21 @@ const chatSlice = createSlice({
       if (state.interpretation.status === 'failed') {
         state.interpretation = { status: 'idle' }
       }
+    },
+    govProgramSelected(state, action: PayloadAction<GovAgentProgram | null>) {
+      if (isBusy(state)) return
+      const program = action.payload
+      if (program && !state.messages.some((message) => message.programs?.some((item) =>
+        item.sourceCode === program.sourceCode && item.id === program.sourceProgramId))) return
+      state.govProgram = program
+      if (state.interpretation.status === 'failed') state.interpretation = { status: 'idle' }
+    },
+    govMessageSucceeded(state, action: PayloadAction<{ requestId: string; message: string; evidence?: GovAgentEvidence }>) {
+      if (state.interpretation.status !== 'pending' || state.interpretation.requestId !== action.payload.requestId) return
+      state.messages.push({ id: `${action.payload.requestId}-answer`, role: 'assistant', text: action.payload.message,
+        ...(action.payload.evidence ? { govEvidence: action.payload.evidence } : {}) })
+      state.interpretation = { status: 'idle' }
+      state.unseenOutcome = 'interpretation-answered'
     },
     interpretationStarted: {
       reducer(state, action: PayloadAction<{ requestId: string; messageId: string; request: SupportProgramInterpretRequest }>) {
@@ -281,6 +298,7 @@ const chatSlice = createSlice({
       ) {
         if (state.activeRequestId !== action.payload.requestId || !state.activeSearchContext) return
         const context = state.activeSearchContext
+        state.govProgram = null
         state.lastSearch = { context, resultCount: action.payload.totalCount }
         state.activeRequestId = null
         state.activeSearchContext = null
@@ -327,6 +345,8 @@ export const {
   searchResultRestored,
   searchResultRestoreFailed,
   draftChanged,
+  govProgramSelected,
+  govMessageSucceeded,
   interpretationStarted,
   interpretationSucceeded,
   interpretationFailed,
@@ -387,6 +407,7 @@ export function createChatConversationSnapshot(state: ChatState): ChatConversati
   } : null
   return {
     schemaVersion: 1, companyDefaultsInitialized: state.companyDefaultsInitialized, messages: interrupted ? [...state.messages, interrupted] : state.messages, searchOptions: state.searchOptions,
+    govProgram: state.govProgram,
     conversationQuery: state.conversationQuery, confirmedSearch: state.confirmedSearch, lastSearch: state.lastSearch,
     pendingProposal: state.pendingProposal, pendingClarification: state.pendingClarification,
     searchStatus: state.searchStatus === 'pending' ? 'failed' : state.searchStatus,
@@ -399,6 +420,7 @@ export function createChatConversationSnapshot(state: ChatState): ChatConversati
 
 function createInitialState(welcomeMessage = createWelcomeMessage()): ChatState {
   return {
+    govProgram: null,
     companyDefaultsInitialized: false,
     accountEmail: null,
     isRestoredHistory: false,

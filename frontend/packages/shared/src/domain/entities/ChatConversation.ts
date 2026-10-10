@@ -1,9 +1,11 @@
+import type { GovAgentEvidence, GovAgentProgram } from './GovAgent'
 import type { SupportProgram } from './SupportProgram'
 import type { SupportProgramCompanyConditions, SupportProgramSearch } from '../repositories/SupportProgramRepository'
 import type { SupportProgramConversationContext, SupportProgramInterpretation, SupportProgramInterpretRequest, SupportProgramLastSearch, SupportProgramPendingClarification } from './SupportProgramConversation'
 
 export type ChatSearchOptions = { acceptingOnly: boolean; companyConditions?: SupportProgramCompanyConditions }
 export type ChatMessage = {
+  govEvidence?: GovAgentEvidence
   id: string
   role: 'assistant' | 'user'
   text: string
@@ -18,6 +20,7 @@ export type ChatMessage = {
 
 /** 저장 시점의 대화와 조건입니다. 실행 중인 요청·인증 정보·미전송 초안은 저장하지 않습니다. */
 export type ChatConversationSnapshot = {
+  govProgram?: GovAgentProgram | null
   schemaVersion: 1
   companyDefaultsInitialized?: boolean
   messages: ChatMessage[]

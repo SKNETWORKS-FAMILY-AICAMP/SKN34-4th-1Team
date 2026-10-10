@@ -657,6 +657,27 @@ flowchart LR
 [실제 호출 경로](docs/architecture.md) · [AI Service](backend/ai-service/README.md) ·
 [문서 작성·형식별 지원 범위](docs/application-document-mcp-architecture.md)
 
+### 8.5 관리자 Gov 에이전트
+
+웹 `/app/chat`에서 관리자에게는 **Gov 에이전트**, 일반 회원에게는 기존 **AI 대화 검색**을 표시합니다.
+현재 연결한 범위는 **검색 조건 제안 → 사용자 확인 후 검색 → 결과의 ‘이 공고 질문’ 선택 → 같은 대화에서 원문 근거 답변**입니다.
+
+```mermaid
+flowchart LR
+    Chat[관리자 대화] --> Core[Core 관리자 권한·요청 제한]
+    Core --> Supervisor[AI supervisor: 실행 경로 선택]
+    Supervisor --> Search[기존 검색 조건 해석]
+    Supervisor --> Evidence[기존 공고 원문 RAG]
+    Search --> Confirm[사용자 확인 후 기존 검색 API]
+    Evidence --> Reply[사용량·인용 검증 후 대화에 답변]
+```
+
+한 턴에 한 기능을 위임하는 초기 supervisor이며, A2A나 별도 Agent 서버를 추가하지 않습니다.
+원문 질문은 사용자가 고른 `(sourceCode, sourceProgramId)`로만 실행합니다. 공고 선택과 인용을 기존 계정별 대화 기록에 보관하고,
+기록을 열 때 AI를 재실행하지 않습니다. 원문 근거가 부족하면 그 상태를 표시합니다.
+신청서 작성·중복 검토·파트너 조회 등 다른 AI 기능의 대화 통합과 여러 단계 자동 실행은 아직 연결하지 않았으며,
+지원하지 않는 요청은 실행 완료로 표시하지 않고 해당 기능 화면을 이용하도록 안내합니다.
+
 <a id="llmops-평가운영"></a>
 
 ## 9. LLMOps 평가·운영

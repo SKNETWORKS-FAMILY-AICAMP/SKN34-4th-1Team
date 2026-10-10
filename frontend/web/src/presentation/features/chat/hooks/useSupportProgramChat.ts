@@ -1,4 +1,7 @@
 import { useEffect } from 'react'
+import type { GovAgentProgram } from '@govbiz/shared/domain/entities/GovAgent'
+import { GovAgentApiError } from '@govbiz/shared/data/api/govAgentApi'
+import { supportProgramClient } from '../../../../data/api/supportProgramClient'
 
 import { appContainer } from '../../../../app/appContainer'
 import { useAppDispatch, useAppSelector } from '../../../../app/hooks'
@@ -19,6 +22,8 @@ import {
   companyDefaultsLoaded,
   conversationReset,
   draftChanged,
+  govProgramSelected,
+  govMessageSucceeded,
   interpretationStarted,
   interpretationSucceeded,
   interpretationFailed,
@@ -68,6 +73,8 @@ export function useSupportProgramChat(
   getMyCompanyUseCase: Pick<GetMyCompanyUseCase, 'execute'> = appContainer.resolve('getMyCompanyUseCase'),
 ) {
   const dispatchToStore = useAppDispatch()
+  const isGovAgent = useAppSelector((state) => state.auth.status === 'authenticated' && state.auth.account?.role === 'ADMIN')
+  const govProgram = useAppSelector((state) => state.chat.govProgram)
   const conversationCount = useAppSelector(selectConversationCount)
   const draft = useAppSelector(selectChatDraft)
   const isReadyToSubmit = useAppSelector(selectIsReadyToSubmit)
@@ -239,6 +246,7 @@ export function useSupportProgramChat(
     return dispatchToStore(async (dispatch: AppDispatch, getState: () => RootState, requests: AppThunkExtra) => {
       const state = getState().chat
       if (state.searchStatus === 'pending' || state.interpretation.status === 'pending') return
+      const govMode = getState().auth.status === 'authenticated' && getState().auth.account?.role === 'ADMIN'
       const started = interpretationStarted(request, messageId)
       const requestId = started.payload.requestId
       const controller = new AbortController()
@@ -246,9 +254,9 @@ export function useSupportProgramChat(
       const timeoutId = setTimeout(() => {
         if (requests.interpretation?.requestId !== requestId) return
         requests.interpretation = null
-        dispatch(interpretationFailed({ requestId, message: '조건 해석 시간이 초과되었습니다. 다시 해석해 주세요.' }))
+        dispatch(interpretationFailed({ requestId, message: govMode ? 'Gov 에이전트 응답 시간이 초과되었습니다. 다시 요청해 주세요.' : '조건 해석 시간이 초과되었습니다. 다시 해석해 주세요.' }))
         controller.abort()
-      }, supportProgramInterpretationTimeoutMilliseconds)
+      }, govMode ? 100_000 : supportProgramInterpretationTimeoutMilliseconds)
       requests.interpretation = { controller, requestId, timeoutId }
       let loadingCompany = false
       try {
@@ -263,17 +271,31 @@ export function useSupportProgramChat(
         }
         const effectiveRequest = getState().chat.interpretation.request
         if (!effectiveRequest || controller.signal.aborted) return
-        const result = await interpretConversationUseCase.execute(effectiveRequest, controller.signal)
-        if (!controller.signal.aborted) dispatch(interpretationSucceeded({ requestId, result }))
+        if (govMode) {
+          const selected = state.govProgram
+          const result = await supportProgramClient.sendGovAgentMessage({ conversation: effectiveRequest,
+            selectedProgram: selected ? { sourceCode: selected.sourceCode, sourceProgramId: selected.sourceProgramId } : null }, controller.signal)
+          if (controller.signal.aborted) return
+          if (result.outcome === 'SEARCH') dispatch(interpretationSucceeded({ requestId, result: result.interpretation }))
+          else if (result.outcome === 'EVIDENCE' && selected) dispatch(govMessageSucceeded({ requestId,
+            message: result.evidence.answer, evidence: { program: selected, answer: result.evidence } }))
+          else if (result.outcome === 'NEEDS_PROGRAM' || result.outcome === 'UNSUPPORTED') {
+            dispatch(govMessageSucceeded({ requestId, message: result.message }))
+          }
+        } else {
+          const result = await interpretConversationUseCase.execute(effectiveRequest, controller.signal)
+          if (!controller.signal.aborted) dispatch(interpretationSucceeded({ requestId, result }))
+        }
       } catch (error) {
         if (!controller.signal.aborted) dispatch(interpretationFailed({ requestId, message:
-          loadingCompany ? '등록된 기업 정보를 불러오지 못했습니다. 다시 해석해 주세요.'
+          planQuotaFailureMessage(error) ?? (error instanceof GovAgentApiError ? error.message
+            : loadingCompany ? '등록된 기업 정보를 불러오지 못했습니다. 다시 해석해 주세요.'
             : error instanceof SupportProgramRequestError ? supportProgramRequestFailureMessage(error)
             : error instanceof SupportProgramInterpretationError
               ? error.reason === 'timeout'
                 ? '조건 해석 응답이 지연되어 시간이 초과되었습니다. 잠시 후 다시 해석해 주세요.'
                 : '조건 해석 서비스를 일시적으로 이용할 수 없습니다. 잠시 후 다시 해석해 주세요.'
-              : '메시지의 조건 변경을 해석하지 못했습니다. 다시 해석해 주세요.',
+              : govMode ? 'Gov 에이전트 응답을 확인하지 못했습니다. 다시 요청해 주세요.' : '메시지의 조건 변경을 해석하지 못했습니다. 다시 해석해 주세요.'),
         }))
       } finally {
         requests.releaseInterpretation(requestId)
@@ -327,6 +349,9 @@ export function useSupportProgramChat(
   }
 
   return {
+    isGovAgent,
+    govProgram,
+    selectGovProgram: (program: GovAgentProgram | null) => { if (isGovAgent) dispatchToStore(govProgramSelected(program)) },
     isRestoredHistory,
     confirmedContext,
     interpretation,

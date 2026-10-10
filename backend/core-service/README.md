@@ -46,6 +46,20 @@ private RDS TLS 검증, Secure 쿠키, 개발 로그인 비활성화, Nginx 고�
 불명확한 응답·중단은 UNKNOWN으로 남기며 자동 재호출하지 않습니다. 대화 기록 삭제는 기존 탈퇴 transaction 안에서 유지합니다.
 [상태·DB 차단·설정·운영자 확인·검증](../../docs/rabbitmq-account-oauth-unlink.md)을 참고하세요.
 
+## 관리자 Gov 에이전트
+
+`POST /api/v1/gov-agent/messages`는 `AdminPrincipal`의 서버 세션·관리자 권한 검사를 거칩니다.
+요청은 기존 조건 해석 계약인 `conversation`과 선택한 공고의 복합 식별자 `selectedProgram`(nullable)입니다.
+`Controller → GovAgentService → AiGovAgentClient → AI supervisor`에서 경로를 선택한 뒤
+동일 Service가 기존 `SupportProgramConversationService` 또는 `SupportProgramEvidenceService`를 실행합니다.
+응답 `outcome`은 `SEARCH`(interpretation), `EVIDENCE`(program·evidence), `NEEDS_PROGRAM` 또는 `UNSUPPORTED`(message)입니다.
+
+검색은 조건 제안까지만 반환하며 확인 후 기존 검색 API가 `AI_SEARCH` 사용량을 집행합니다.
+원문 답변은 기존 `PlanUsageService.consume(EVIDENCE_QUESTION)`에서 처리하므로 실패 시 사용량 반환도 유지합니다.
+공유 요청 제한을 적용하고 응답은 `no-store`입니다. AI에 계정 ID·권한·임의 도구 URL을 전달하지 않으며,
+분류용 문장의 개인 식별 정보는 기존 마스킹을 재사용합니다. 알 수 없는 AI action과 upstream 오류는 명시적인 오류입니다.
+새 DB·migration·실행 서비스는 필요하지 않습니다. 신청 문서·중복 검토 등은 아직 이 대화 API에 연결하지 않았습니다.
+
 ## 계정별 대화 기록
 
 `ai.govbiz.core.chathistory`는 로그인 회원 본인의 대화 스냅샷을 보관합니다. `V19__create_chat_conversation.sql`로

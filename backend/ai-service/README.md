@@ -3,6 +3,16 @@
 FastAPI, OpenAI 임베딩, Qdrant로 전체 공고에서 관련 후보를 찾고 LangChain으로 후보를
 점수화하고 원문 근거 답변을 생성하는 내부 RAG 서비스입니다. 브라우저에 직접 공개하지 않고 Spring Core API만 호출합니다.
 
+## 관리자 Gov 에이전트 경로 선택
+
+`POST /internal/v1/gov-agent/decide`는 `GovAgentSupervisor → 기존 LangChain 호출 → OpenAI → strict action 검증`으로
+`SEARCH`, `EVIDENCE`, `UNSUPPORTED` 중 하나를 반환합니다. 실제 검색 조건 해석·원문 RAG는 Core의 기존 Service가 실행합니다.
+한 턴에 한 기능을 위임하는 초기 supervisor이며 A2A, 새 프레임워크, 자유로운 도구 호출 루프는 추가하지 않습니다.
+기존 `OPENAI_ASSISTANT_MODEL`을 사용하고 한 번의 모델 호출·출력 200토큰·최대 20초·재시도 없음·`store=false`를 적용합니다.
+선택 여부와 검색 문맥만 받고 사용자 계정·역할·공고 원문·도구 주소는 받지 않습니다.
+잘못된 action은 503, 시간 초과는 504로 반환하며 검색 성공으로 대체하지 않습니다.
+내부 API는 Core에서만 호출하며 공개 API의 관리자 권한·사용량·복합 식별자·인용 검증은 Core가 소유합니다.
+
 ## AI 대화 검색·상세 질의응답의 LangChain RAG
 
 - 조건 해석: Core → Conversation Service → Agent → LangChain 프롬프트 체인 → OpenAI Responses API → 조건 패치 검증.
