@@ -205,7 +205,7 @@ def build_application_container(
         support_program_ranking_service=SupportProgramRankingService(ranking_agent, tracing=llm_tracing),
         support_program_conversation_service=SupportProgramConversationService(conversation_agent),
         gov_agent_supervisor=GovAgentSupervisor(
-            model=_chat_model(settings, settings.openai_assistant_model, "none"),
+            model=_chat_model(settings, settings.openai_assistant_model, settings.openai_assistant_reasoning_effort),
             timeout_seconds=settings.llm_model_timeout_seconds,
         ),
         assistant_service=AssistantService(assistant_agent),

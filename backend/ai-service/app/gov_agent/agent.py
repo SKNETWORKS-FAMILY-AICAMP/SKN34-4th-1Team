@@ -31,8 +31,9 @@ class GovAgentSupervisor:
 
     def __init__(self, *, model: ChatOpenAI, timeout_seconds: float) -> None:
         self._timeout_seconds = min(timeout_seconds, 20)
+        # 도우미 모델의 추론 설정을 유지하고, 기존 도우미와 같은 추론 포함 출력 예산을 둔다.
         self._model = model.bind(
-            max_tokens=200, store=False, reasoning={"effort": "none"}, timeout=self._timeout_seconds,
+            max_tokens=1_200, store=False, timeout=self._timeout_seconds,
         )
 
     async def decide(self, request: GovAgentRequest) -> GovAgentDecision:

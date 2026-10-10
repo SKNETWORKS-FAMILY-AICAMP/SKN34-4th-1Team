@@ -2,11 +2,13 @@
 
 from pathlib import Path
 import importlib.util
+import json
 import os
 import re
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 
 SCRIPT = Path(__file__).with_name("verify-compose.sh")
@@ -238,6 +240,55 @@ printf '%s' '200'
         self.assertIn(listing, script)
         self.assertLess(script.index(forms), script.index(creation))
         self.assertLess(script.index(listing), script.index(creation))
+
+
+class ProductionProxyReadinessTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("production_proxy", SCRIPT.with_name("verify-production-proxy.py"))
+        cls.proxy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.proxy)
+
+    def response(self, path, upstream):
+        return 200, [], json.dumps({"method": "GET", "path": path, "body": "", "upstream": upstream}).encode()
+
+    def test_core_ready_does_not_skip_delayed_ops_startup(self):
+        core, ops = "/api/test", "/api/v1/ops/session"
+        call = Mock(side_effect=[self.response(core, "core"), (502, [], b"<html>Bad Gateway</html>"),
+                                 self.response(ops, "ops")])
+        with patch.object(self.proxy.time, "sleep") as sleep:
+            self.proxy.wait_for_upstreams(call, [(core, "core"), (ops, "ops")])
+        self.assertEqual([core, ops, ops], [item.kwargs["path"] for item in call.call_args_list])
+        sleep.assert_called_once_with(1)
+
+    def test_wrong_upstream_and_invalid_json_never_count_as_ready(self):
+        path = "/api/v1/ops/session"
+        for response in (self.response(path, "core"), (200, [], b"<html>not JSON</html>"),
+                         (503, [], b"unavailable")):
+            with self.subTest(response=response), patch.object(self.proxy.time, "sleep"):
+                call = Mock(return_value=response)
+                with self.assertRaisesRegex(RuntimeError, "Nginx/ops stub startup failed: /api/v1/ops/session"):
+                    self.proxy.wait_for_upstreams(call, [(path, "ops")])
+                self.assertEqual(45, call.call_count)
+
+    def test_proxy_failure_after_startup_is_not_retried_or_json_decoded(self):
+        index = b'<div id="root"><script src="/assets/main.js"></script>'
+
+        def response(method="GET", path="/", body=None):
+            if path in ("/", "/login", "/ops/evaluations", "/app/chat"):
+                return 200, [("Cache-Control", "private, no-store")], index
+            if path == "/assets/main.js":
+                return 200, [("Cache-Control", "public, immutable")], b"bundle"
+            if path in ("/assets/missing.js", "/api"):
+                return 404, [], b""
+            if path == "/healthz":
+                return 200, [], b""
+            return 502, [], b"<html>Bad Gateway</html>"
+
+        call = Mock(side_effect=response)
+        with self.assertRaisesRegex(AssertionError, "GET /api/v1/account: HTTP 502"):
+            self.proxy.verify_web(call)
+        self.assertEqual(1, sum(bool(item.args) for item in call.call_args_list))
 
 
 class PublicNoticeFixtureTest(unittest.TestCase):

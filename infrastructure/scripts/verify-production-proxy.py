@@ -17,6 +17,25 @@ def docker(*args):
     return subprocess.check_output(["docker", *args], text=True).strip()
 
 
+def wait_for_upstreams(call, upstreams):
+    for path, upstream in upstreams:
+        for _ in range(45):
+            try:
+                status, _, data = call(path=path)
+                last_response = f"{path}: HTTP {status}, body={data[:200]!r}"
+                if status == 200:
+                    payload = json.loads(data)
+                    if isinstance(payload, dict) and all(payload.get(key) == value for key, value in {
+                        "upstream": upstream, "method": "GET", "path": path, "body": "",
+                    }.items()):
+                        break
+            except (OSError, http.client.HTTPException, ValueError) as error:
+                last_response = f"{path}: {type(error).__name__}: {error}"
+            time.sleep(1)
+        else:
+            raise RuntimeError(f"Nginx/{upstream} stub startup failed: {last_response}")
+
+
 def verify_web(call):
     status, headers, index = call(path="/")
     assert status == 200 and b'<div id="root">' in index
@@ -35,7 +54,11 @@ def verify_web(call):
                            ("/api/v1/application-preparations/1/documents", "core")):
         for method in ("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
             status, headers, data = call(method, path + "?q=%EC%84%9C%EC%9A%B8", body='{"test":true}')
-            payload = json.loads(data)
+            assert status == 200, f"{method} {path}: HTTP {status}, body={data[:200]!r}"
+            try:
+                payload = json.loads(data)
+            except ValueError as error:
+                raise AssertionError(f"{method} {path}: expected stub JSON, body={data[:200]!r}") from error
             received = {k.lower(): v for k, v in payload["headers"].items()}
             assert status == 200 and payload["upstream"] == upstream
             assert payload["path"] == path + "?q=%EC%84%9C%EC%9A%B8"
@@ -116,15 +139,14 @@ def main(web_image=None):
             finally:
                 connection.close()
 
-        for attempt in range(45):
-            try:
-                if call()[0] == 200:
-                    break
-            except OSError:
-                pass
-            time.sleep(1)
-        else:
-            raise RuntimeError("Nginx/stub startup failed: " + docker("logs", containers[-1]) + docker("logs", containers[0]))
+        upstreams = [("/api/test", "core")]
+        if web_image:
+            upstreams.append(("/api/v1/ops/session", "ops"))
+        try:
+            wait_for_upstreams(call, upstreams)
+        except RuntimeError as error:
+            logs = "\n".join(docker("logs", container_id) for container_id in containers)
+            raise RuntimeError(f"{error}\n{logs}") from error
         if web_image:
             verify_web(call)
             docker("stop", "--time", "1", containers[1])

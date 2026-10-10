@@ -75,7 +75,7 @@
     }
   },
   "rag_generation": {
-    "sha256": "f7c1fa8038604044999dc2551bac4e9926fbeda334d5f082a3e4ef6b7cff47ae",
+    "sha256": "21386be695314c21b4fc2bc1b14e06fc732f0733570f42ff9637091ddf49f75a",
     "files": {
       "evaluation/support-program-evidence/evaluate.py": "0430f08ad1f51c9a8fd22119e0b4d0badac9f89ab8e254e963a4944bd79ed514",
       "evaluation/support-program-evidence/official_snapshot.py": "1b97e2d2aa15ca02b50e2a999203c7f685de08afc735bb8456b880041c37abf4",
@@ -97,7 +97,7 @@
       "evaluation/support-program-evidence/embedding_budget.py": "79449cc479a04efd0397621b48a0bb0258ed97690b40c90081d36ac8f2bee635",
       "evaluation/support-program-evidence/budget_client.py": "5fb2ba03088467201693f94ec2c2b074ab15998f4e2ea6724c0c67cdef6613f9",
       "evaluation/support-program-evidence/serve_flow.py": "494ffa688f2fcf6ca0720b53eeeeaa899c617e8783f01fe5a8c9d45e803868e4",
-      "backend/ai-service/app/bootstrap.py": "693ccbf69624f0aada6c6bf88c619f8c217e6d6bf47a92c75e3243602925bc86",
+      "backend/ai-service/app/bootstrap.py": "4efddd18d97d4988e7301c578811cf9398200d623e0a4cc59f0128ff90ad9ee3",
       "backend/ai-service/app/main.py": "166565c55888c4e22390720f805ae20634c94efaf87a8410e774e465a77b76d0",
       "backend/ai-service/app/support_program_embedding.py": "944c846cb01022a74578aad4c088387b555444b56e3b73085ba62885381aa2d5",
       "backend/ai-service/app/support_program_evidence/service.py": "3206ead966556d3cf2f73e4ab278afd1fbbaaea563054faec4d3318726539fdf",

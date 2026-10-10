@@ -27,11 +27,26 @@ async def test_one_bounded_decision_without_executing_tools(action, message, has
     assert (await supervisor.decide(request)).action == action
     call = model.first_call
     assert call.body["store"] is False
+    assert call.body["max_output_tokens"] == 1_200
     assert call.timeout == 3
     assert len(model.calls) == 1
     assert json.loads(call.input[0]["content"])["hasSelectedProgram"] is has_selected_program
     assert call.schema["properties"]["action"]["enum"] == ["SEARCH", "EVIDENCE", "APPLICATION", "UNSUPPORTED"]
     assert not call.body.get("tools")
+    model.assert_complete()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("reasoning_effort", ["low", "minimal", "none"])
+async def test_model_reasoning_survives_binding_with_bounded_output_and_timeout(reasoning_effort):
+    model = ResponsesChatStub([[response_message('{"action":"SEARCH"}')]])
+    model.model.reasoning = {"effort": reasoning_effort}
+    supervisor = GovAgentSupervisor(model=model.model, timeout_seconds=25)
+    assert (await supervisor.decide(GovAgentRequest(message="사업 검색", hasSelectedProgram=False))).action == "SEARCH"
+    assert model.first_call.body["reasoning"] == {"effort": reasoning_effort}
+    assert model.first_call.body["max_output_tokens"] == 1_200
+    assert model.first_call.timeout == 20
+    assert len(model.calls) == 1
     model.assert_complete()
 
 

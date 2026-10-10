@@ -45,13 +45,16 @@ class FakeChatOpenAI:
 
 
 @pytest.mark.anyio
-async def test_agent_models_tool_client_and_service_are_wired_and_closed(monkeypatch):
+@pytest.mark.parametrize("assistant_reasoning_effort", [None, "minimal", "none"])
+async def test_agent_models_tool_client_and_service_are_wired_and_closed(monkeypatch, assistant_reasoning_effort):
     FakeChatOpenAI.instances = []
     client = FakeOpenAIClient()
     monkeypatch.setattr(bootstrap_module, "AsyncOpenAI", lambda **kwargs: client)
     monkeypatch.setattr(bootstrap_module, "OpenAIResponsesModel", lambda **kwargs: ScriptedModel([]))
     monkeypatch.setattr(bootstrap_module, "ChatOpenAI", FakeChatOpenAI)
     settings = replace(SETTINGS, openai_assistant_agent_model="gpt-5.6-sol", openai_assistant_agent_reasoning_effort="low")
+    if assistant_reasoning_effort is not None:
+        settings = replace(settings, openai_assistant_reasoning_effort=assistant_reasoning_effort)
     container = build_application_container(settings)
     try:
         assert isinstance(container.assistant_agent_service, AssistantAgentService)
@@ -66,13 +69,14 @@ async def test_agent_models_tool_client_and_service_are_wired_and_closed(monkeyp
         assert combination.kwargs["timeout"] == 60
         # 분류는 도우미와 같은 싼 모델·low, 계획·답은 전용 모델. 둘 다 저장 안 함·재시도 없음·도우미 제한 시간.
         assert classify.kwargs == {"model": "gpt-5-nano", "api_key": "private-key", "use_responses_api": True, "store": False,
-                                   "reasoning": {"effort": "low"}, "timeout": 1.25, "max_retries": 0}
+                                   "reasoning": {"effort": assistant_reasoning_effort or "low"}, "timeout": 1.25, "max_retries": 0}
         assert agent.kwargs == {"model": "gpt-5.6-sol", "api_key": "private-key", "use_responses_api": True, "store": False,
                                 "reasoning": {"effort": "low"}, "timeout": 1.25, "max_retries": 0}
         assert isinstance(container.gov_agent_supervisor, GovAgentSupervisor)
         assert container.gov_agent_supervisor._model.bound is supervisor
         assert supervisor.kwargs == {"model": "gpt-5-nano", "api_key": "private-key", "use_responses_api": True, "store": False,
-                                     "reasoning": {"effort": "none"}, "timeout": 1.25, "max_retries": 0}
+                                     "reasoning": {"effort": assistant_reasoning_effort or "low"}, "timeout": 1.25, "max_retries": 0}
+        assert "reasoning" not in container.gov_agent_supervisor._model.kwargs
         tool_client = container.assistant_tool_client
         assert tool_client is not None and tool_client.enabled
         assert str(tool_client._client.base_url) == "http://core-service:8080"
