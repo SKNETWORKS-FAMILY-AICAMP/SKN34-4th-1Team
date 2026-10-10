@@ -82,7 +82,7 @@ GovBiz CI의 기존 `Web and shared` 작업에서 정적 이미지 빌드와 기
 유료 모델이나 실제 데이터에 연결하지 않는다. 기존 AWS 프록시 검사도 같은 도구에 유지한다.
 Infra CI는 기존 서비스 Chart 렌더링 테스트와 lint에 웹을 포함한다.
 
-운영 인계는 다음 순서가 남아 있다.
+운영 인계 절차는 다음과 같다.
 
 1. 변경 커밋의 필수 CI 성공을 확인한다.
 2. 기본 브랜치의 `Kubernetes package setup`에서 `component=web`과 정확한 패키지 주소를
@@ -101,76 +101,41 @@ Infra CI는 기존 서비스 Chart 렌더링 테스트와 lint에 웹을 포함�
 웹은 여러 workspace 입력과 `portfolio` 모드를 묶은 v4 receipt를 사용하므로 기존 네 백엔드
 배포 묶음에 포함하지 않는다. [발행 안내](../../release/README.md#kubernetes-웹-이미지)
 
-이번 소스 변경만으로 공개 이미지가 발행되거나 기존 8개 Argo Application에 웹이 추가되지는
-않는다. Kubernetes 웹 전환 완료와 외부 ingress/TLS 완료도 별개다.
+Kubernetes 웹 전환 완료와 외부 ingress/TLS 완료는 별개다.
 
-## 2026-10-10 로컬 확인
+## 2026-10-11 배포 확인
 
-- 기존 Vite 설정 테스트 15개, 서비스 Chart 테스트의 11개 항목, Helm 4.3.0 웹 lint를 확인했다.
-  새 렌더링 테스트의 리소스 순서 가정 오류는 종류로 찾도록 수정하고 해당 항목을 재실행했다.
-- 설치된 workspace 의존성으로 `tsc -b`와 `vite build --mode portfolio`를 통과했다.
-- 해당 정적 번들을 **같은 Nginx 런타임 단계**에 넣은 검사 전용 이미지로 가상 Core·Ops를
-  연결했다. SPA 새로고침·정적 파일·메서드/본문/쿼리·Host/Origin/쿠키/CSRF 헤더 전달·캐시와
-  헤더 경계·API 404·2MiB 제한·리다이렉트를 확인했다. UID 101·읽기 전용 루트로 실행했다.
-- 가상 Ops를 중지했을 때 API는 오류를 반환하고 정적 웹은 계속 제공하는 것도 확인했다.
-  실제 Core 로그인이나 Django CSRF 정책을 검증한 결과로 확대하지 않는다.
-- 같은 도구의 기존 AWS 프록시 검사도 통과해 기존 비밀 헤더·IP·쿠키 전달 계약을 유지했다.
-- 로컬 Dockerfile 전체 빌드는 npm의 `ECONNRESET`·`UND_ERR_SOCKET`이 반복되어 두 시도 후
-  중단했다. 동시 다운로드를 8개로 제한해도 반복됐으며 빌더 OOM 기록은 없었다.
-  공급망 검사나 잠금 파일을 완화하지 않았다. 이 전체 빌드는 다음 커밋의 CI 확인 대상이다.
+배포 대상은 `289c18a9d7a9674c8d7dcf04a93d42c744897e62`다. 이 SHA의 필수 CI가
+모두 실제 실행되어 성공했다.
 
-검사 전용 이미지나 로컬 정적 빌드를 공개 발행본으로 취급하지 않으며, 기존 개인 웹·Kubernetes
-서비스를 이 이미지로 교체하지 않았다. 임시 검사 컨테이너·네트워크는 제거하고 빌더는 중지했다.
+- [GovBiz CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38066804225): 웹·공통 패키지와 Linux 웹 이미지 빌드·프록시 검사 포함
+- [Catalog separation CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38066804144)
+- [GovBiz Ops CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38066804159)
+- [Infra CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38066804143)
+- [LLMOps CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38066804092): 두 번째 실행 성공. 첫 실행의 Gradle 의존성 다운로드 실패 후 소스 변경 없이 실패한 작업만 재실행했다.
 
-후속 `skn-422` CI에서는 npm 설치가 성공한 뒤 `tsc -b`가 실패했다. 웹 테스트가 참조하는
-`evaluation/application-map/fixtures/synthetic-online-input-guide-v1.json`이 Docker context에
-없던 것이 원인이다. 해당 합성 파일 하나를 빌드 단계·dockerignore 허용 목록·발행 archive 입력에
-포함하도록 수정했다. 타입 검사를 제외하거나 전체 evaluation 디렉터리를 이미지에 넣지 않는다.
-최종 Nginx 단계에는 계속 정적 번들과 Nginx 설정만 복사한다.
-
-수정 확인은 Docker와 같은 소스 경로만 복사한 격리 디렉터리에서 수행했다. 합성 JSON을 뺀
-`tsc -b --force`에서 동일한 `TS2307`을 재현했고, 추가한 뒤 타입 검사와 `portfolio` 정적 빌드가
-통과했다. 설치된 의존성을 사용한 Windows 확인이며 Linux 이미지 빌드 성공을 대신하지 않는다.
-수정 후 로컬 전체 이미지 빌드도 npm의 `UND_ERR_SOCKET`·`ECONNRESET`이 반복되어 중지했다.
-새 커밋의 필수 CI에서 전체 이미지 빌드·프록시를 확인해야 한다.
-
-## 2026-10-10 병합본 CI 확인과 후속 수정
-
-`skn-424`가 병합된 `c391f55b9b9b344ce56c115de6e1b348c814bb0c`의
-[GovBiz CI 실행](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38045961584)에서
-Linux 웹 Docker 이미지 빌드가 성공했다. 합성 JSON 누락 문제는 해결됐으며, 정적 파일·SPA·
-Core/Ops 라우팅·본문·쿠키·CSRF 헤더 전달 검사도 통과했다.
-
-마지막 Ops 장애 검사에서는 검사 클라이언트의 3초 제한이 Nginx의 3초 연결 제한과 겹쳐
-HTTP 오류 응답을 읽기 전에 `TimeoutError`가 발생했다. 기존 검사 도구에서 이 요청만 10초까지
-기다리도록 수정했다. Nginx의 운영 제한은 유지하고, 실제 `502` 또는 `504`·캐시 금지·SPA로
-대체하지 않는 응답·정적 웹 지속 제공을 계속 확인한다. 요청 실패 시에도 검사 소켓을 닫는다.
-
-수정 후 기존 로컬 Nginx 검사 이미지로 전체 웹 프록시·Ops 중단 경로를 통과했고 Ruff 검사도
-통과했다. 이 실행은 기존 런타임 단계 검사 이미지를 사용했으며 공개 이미지 발행은 아니다.
-별도 검사 도구나 워크플로는 추가하지 않았다. 실패한 병합본 CI를 성공으로 간주하지 않으며,
-수정 커밋의 필수 CI가 통과한 뒤 공개 패키지 준비·웹 이미지 발행·Argo 인계를 진행해야 한다.
-
-후속 병합본 `247fbfb2fdca8a7450f851761d881b31d5cbb181`의
-[GovBiz CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38058218758)에서는
-`Web and shared` 작업이 성공해 이미지 빌드와 Ops 장애 응답 확인까지 통과했다.
-전체 발행 승인에는 나머지 필수 CI의 성공도 필요하다.
-
-별도로 이전 [LLMOps CI](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38045961595)의
-복원 브라우저 검사가 보고서 링크의 이전 경로를 가정해 실패한 것을 확인했다. 실제 화면은
+기존 검사에서 실제 보고서 화면과 달랐던 경로·응답 수집을 수정했다. 화면은
 `평가 상세 → /ops/evaluations/:id/report 해설 → /api/v1/ops/evaluations/:id/report 원본`
-순서다. 기존 `ops_restore_browser.mjs`가 이 경로를 직접 따라가도록 수정했다. 해설의 실행 ID와
-원본 링크를 확인하고, 원본 HTML 해시·응답 헤더·보안 격리·회원 접근 거절 확인은 유지한다.
-해설 화면을 원본 HTML의 보안 격리 대상으로 취급하거나 원본 검사를 생략하지 않는다.
-별도 검사기·워크플로·발행 예외를 추가하지 않았으며, 이 수정도 병합본 필수 CI에서 확인해야 한다.
-로컬 Node 24.20.0과 격리된 Edge 브라우저에서 기존 브라우저 테스트 7개를 통과했다.
-실제 Evidently HTML 렌더링, 의도적인 스크립트 오류, 보고서 변조·권한 거절과 자원 정리를
-포함하며 외부 API·실제 계정·유료 모델은 사용하지 않았다.
+순서이며, 해설에 필요한 `/rag-material`도 복원 응답에 포함한다. 원본 보고서 해시·보안 헤더·
+권한 거절·세션 폐기 검사는 유지한다. 별도 검사기나 발행 예외를 추가하지 않았다.
+관련 로컬 관리 화면·브라우저 테스트 24개와 Ruff 검사를 통과했고 유료 모델 호출은 없었다.
 
-`skn-429` 후속 점검에서는 같은 이전 링크 가정이 실제 로그인 검사인
-`ops_browser_login.mjs`에도 남아 있는 것을 확인했다. 기존 HTTP fixture 테스트에서
-`/ops/evaluations/:id/report`와 `/api/v1/ops/evaluations/:id/report`의 불일치를 재현한 뒤,
-화면 링크는 해설 경로·새 탭·`noopener noreferrer`를 확인하고 원본 HTML 해시·응답 헤더는
-계속 API 경로에서 확인하도록 수정했다. 로그인·페이지 이동·세션 폐기 검사는 그대로 유지한다.
-실제 로그인 검사도 복원 브라우저 검사와 함께 CI에서 실행되므로 이 수정까지 병합한 소스로
-필수 CI를 통과해야 웹 패키지·이미지를 발행할 수 있다.
+개인 클러스터 `govbiz-f218b0ac1c`의 `govbiz-msa`에 실제 배포를 완료했다.
+
+- [패키지 준비](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38071544847): Actions 임시 토큰으로 준비했다. Public·개인 포크 연결을 확인했고, 권한 상속을 해제한 뒤 Actions 권한을 Write로 줄였다.
+- [웹 이미지 발행](https://github.com/ilil1/SKN34-4th-1Team/actions/runs/38072072123): `publish (web)`과 전체 실행이 성공했다. v4 receipt의 소스 입력·발행 정책·`portfolio` 모드를 대조했고, 인증 없는 레지스트리 조회도 통과했다.
+- 배포 이미지: `ghcr.io/ilil1/skn34-4th-1team-web@sha256:46167f3915f3ceb70beed324a6e99876f62a9ea88efd4e714d4d0ed94915f4f4`
+- `govbiz-fork-web`은 위 SHA의 Chart와 웹 values를 사용하며 수동 동기화로 운영한다. `localMode=false`, `pullPolicy=IfNotPresent`, digest 고정을 적용했다.
+- 웹 Pod가 이 공개 digest를 직접 내려받아 `Ready`가 됐고 재시작은 0회다. 기존 앱을 포함한 Argo Application 9개가 모두 `Synced / Healthy`였다.
+- [Kubernetes 웹](http://localhost:18173/)과 [관리 화면](http://localhost:18173/ops/evaluations)을 연결했다. 이 주소는 로컬 포트포워드가 실행 중일 때 사용할 수 있다. 기존 5173 개발 서버와 13000 Langfuse는 유지했다.
+- 브라우저의 필터 검색 화면에서 실제 지원사업 1,223건과 공고 목록 표시를 확인했다.
+- 실제 Core 관리자 비밀번호 로그인·HttpOnly 쿠키·Core/Ops 동일 사용자·새로고침·평가 이력 12건·기존 완료 보고서 4개의 원본 해시를 확인했다. 로그아웃 뒤 익명 접근과 폐기한 세션 재사용이 모두 401로 거절됐다.
+- 배포를 위해 잠시 추가한 개인 main 잠금은 해제했다. 기존 삭제·강제 푸시 방지 ruleset은 보존했다.
+
+로컬 실행 증거는 Git에서 제외된 `work/web-release-20261011/`에 있다. 기존 관리자 비밀번호와
+kubeconfig를 이 디렉터리로 복사하지 않았다. 실제 로그인 결과는 `actual-web-login.json`,
+발행 receipt는 `web-image/web.json`, 배포 상태는 `runtime-final.json`에서 확인한다.
+
+이번 완료 범위는 공개 이미지 기반의 **로컬 Kubernetes 웹 연결**이다. EKS 클러스터·외부
+Ingress/ALB·DNS·TLS·AWS IAM 및 운영 스토리지 준비는 별도 단계다. `portfolio` 빌드를 사용했으며
+유료 평가나 모델 품질 측정은 실행하지 않았다.
