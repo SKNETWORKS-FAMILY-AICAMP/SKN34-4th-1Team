@@ -147,6 +147,17 @@ class InClusterConnectionsTests(unittest.TestCase):
                             self.assertNotIn("value", entry)
                     if service == "core-service":
                         self.assertEqual(env["APP_CORS_ALLOWED_ORIGIN"], "http://localhost:18173")
+                        self.assertEqual(env["CATALOG_SERVICE_URL"],
+                            "http://catalog-service.govbiz-msa.svc.cluster.local:8081")
+                        self.assertEqual(env["AI_SERVICE_BASE_URL"],
+                            "http://ai-service.govbiz-msa.svc.cluster.local:8000")
+                        self.assertEqual(env["RABBITMQ_HOST"],
+                            "rabbitmq.govbiz-msa.svc.cluster.local")
+                        self.assertEqual(env["RABBITMQ_PORT"], "5672")
+                        for flag in ("DAILY_REPORT_QUEUE_ENABLED", "DAILY_REPORT_DELIVERY_QUEUE_ENABLED",
+                                     "COMBINATION_REVIEW_QUEUE_ENABLED", "APPLICATION_FORM_DISCOVERY_QUEUE_ENABLED",
+                                     "ACCOUNT_OAUTH_UNLINK_QUEUE_ENABLED", "ASSISTANT_PREFETCH_QUEUE_ENABLED"):
+                            self.assertEqual(env[flag], "false")
                     if service == "web":
                         self.assertEqual(env, {})
                         self.assertEqual(container["ports"][0]["containerPort"], 8080)

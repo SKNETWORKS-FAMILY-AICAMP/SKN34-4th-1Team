@@ -95,7 +95,10 @@ helm template data infrastructure/gitops/charts/govbiz-local-data \
 RabbitMQ를 쓰는 환경은 `rabbitmq.enabled=true`, `existingClaims.rabbitmq`, 고정 이미지와
 `rabbitmq-runtime` Secret도 준비한다. 사용자·vhost·노드 이름과 Erlang cookie가 복원 자료와
 일치해야 한다. 기존 Compose 노드의 데이터 디렉터리를 이름이 다른 노드에 그대로 연결하지 않는다.
-이 설정만으로 Core의 업무 큐 소비·발송 기능이 켜지지는 않는다.
+Core는 이 프로필의 `rabbitmq.govbiz-msa.svc.cluster.local:5672`에 연결한다.
+업무 큐를 켤 때는 환경별 Core values의 `secretKeys`에 기존 키들과 함께 `RABBITMQ_PASSWORD`를
+포함하고, `core-runtime`에 RabbitMQ 계정과 일치하는 비밀번호를 주입한다. 큐별 활성화 플래그도
+별도로 지정한다. 이 프로필의 기본값은 큐 소비·발송 기능을 켜지 않는다.
 
 Helm의 오프라인 검증은 PVC의 존재·Bound 상태·접근 모드·노드 배치·복원 내용까지 확인하지 않는다.
 실제 전환에서는 이를 확인하고 원본 쓰기를 중지한 뒤 일관된 백업·복원과 애플리케이션 검증을 수행한다.
@@ -112,6 +115,34 @@ MySQL 초기화 환경변수는 기존 DB의 사용자·비밀번호를 바꾸�
 5. 정적 웹의 로그인·Ops 조회를 검증하고, 실행기를 별도로 활성화해 무료 평가·보고서·추적을 확인한다.
 6. 기존 Compose가 멈춘 상태에서도 같은 결과가 유지되는 것을 확인한 뒤 실제 이전 완료로 기록한다.
 
-현재 변경의 확인 범위는 Helm 4.3.0 렌더링·PVC 연결·내부 주소·Secret 참조·비활성 기본값이다.
-`scripts/test_in_cluster.py`는 Infra CI의 기존 전체 테스트 검색에 포함된다. 실제 데이터 이전,
-클러스터 배포·NetworkPolicy 집행·로그인·무료 평가·장애 복구는 아직 이 변경의 완료 증거가 아니다.
+자동 검증 범위는 Helm 4.3.0 렌더링·PVC 연결·내부 주소·Secret 참조·비활성 기본값이다.
+`scripts/test_in_cluster.py`는 Infra CI의 기존 전체 테스트 검색에 포함된다. 이 검증만으로 실제
+데이터 이전·클러스터 배포·NetworkPolicy 집행·로그인·무료 평가·장애 복구 완료를 판단하지 않는다.
+
+## 로컬 전환 확인 기록 — 2026-10-11
+
+로컬 `govbiz-migration-20261011` 클러스터에 환경별 values와 Secret을 적용한 결과다.
+이 디렉터리의 기본값을 적용하는 것만으로 같은 데이터·유료 실행 설정이 만들어지지는 않는다.
+
+| 확인 대상 | 실제 확인 결과 |
+| --- | --- |
+| 독립 서비스 | AI·Catalog·Catalog MySQL·RabbitMQ를 기동하고 Core를 내부 Service DNS로 연결. 관련 Pod 21개 Ready, 실행 Pod가 사용하는 PVC 13개 Bound |
+| 공고 보존 | 기존 Core DB의 공고 10,129건과 동기화 상태를 Catalog DB에 복사. 복사 시 모든 열의 해시 일치 확인, Core의 기존 공고 ID·원본 식별자·공개 여부 보존 |
+| Catalog → Core | 기업마당 1,526건·K-Startup 4,143건·과기정통부 4,249건의 공개 공고를 반영하고 제공처별 checkpoint 저장. 미발행 CNTRADE는 전환 대상에서 제외 |
+| 검색 색인 | 기존 Elasticsearch·Qdrant 데이터를 그대로 사용. 공고 전체 재색인·재임베딩 없이 검색 가능 상태 9,918건 확인 |
+| 실제 검색 | Kubernetes 웹 → Core → Elasticsearch·AI → Qdrant·OpenAI 경로로 `스마트공장 지원` 1회 실행. HTTP 200, 약 38.2초, 후보 20건에서 5건 선정. 비회원 응답에는 기존 정책에 따라 2건 표시 |
+| 호출·추적 | 질문 임베딩 1회(입력 8토큰), 순위 평가 1회(입력 27,633·출력 2,950토큰), 추가 유료 재시도 없음. Langfuse 추적 17개 모두 종료·오류 없음 확인 |
+| RabbitMQ | 리포트 생성·전달, 중복 수혜 검토, 신청 양식 탐색의 큐 4개에 Core 소비자 연결. 존재하지 않는 작업 ID의 메시지 1건으로 발행·수신·ACK 검증, 업무 행 생성·모델 호출 없음 |
+| 보존·백업 | 원래 Compose 볼륨 유지. 전환 전후 Core DB와 전환 후 Catalog DB·인증 설정의 암호화 백업 보관. 연결된 PV의 `Retain` 정책 확인 |
+
+실제 검색은 공개 공고 최대 20건과 질문 임베딩·순위 평가 각 1회, 출력 최대 10,000토큰으로
+사용자에게 승인받아 실행했다. 이 한 건의 성공을 전체 RAG 품질이나 모든 업무 기능의 검증으로
+해석하지 않는다. 자동 수집·전체 색인 갱신·메일·푸시·Ops 유료 평가·정기 실행은 활성화하지 않았다.
+관심 공고의 원문 자동 준비는 기존 `PENDING` 1건이 추가 임베딩 호출을 유발하므로 보류했다.
+OAuth 연결 해제도 기존 비활성 설정을 유지했다. 큐 연결 검증은 실제 메일 발송이나 모델 작업
+완료 검증과 구분한다.
+
+환경별 적용 파일·백업·확인 결과는 Git에서 제외된
+`.data/kubernetes-migration/20261011/expansion/`에 보관한다. 비밀값과 DB 덤프는 저장소에 추가하지
+않는다. EKS는 아직 생성·배포하지 않았다. EKS로 옮길 때는 검증된 이미지의 레지스트리 발행,
+EBS 등 새 PVC로의 복원, Secret 주입, 외부 HTTPS·로그인·네트워크 및 검색 경로를 별도로 검증해야 한다.
