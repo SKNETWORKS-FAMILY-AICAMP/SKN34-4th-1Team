@@ -292,6 +292,7 @@ jobs:
           recovery_id=$(python -c 'import json; print(json.load(open("work/llmops-ci/ops-recovery-verification.json"))["request_id"])')
           dc run --rm --no-deps -v "$fixture" -e OPENAI_API_KEY= -e LLMOPS_LIVE_ENABLED=false evaluation-runner .venv/bin/python /tmp/recovery_smoke_fixture.py verify --source-id "$source_id" --recovery-id "$recovery_id"
       - name: Stop this job's development containers
+        # Earlier validation can fail before the Compose env files are created.
         if: ${{ always() && steps.development-credentials.outcome == 'success' }}
         run: docker compose --env-file infrastructure/llmops/.env --env-file infrastructure/llmops/.env.ops --env-file infrastructure/llmops/.env.artifacts -f infrastructure/llmops/compose.yaml -f infrastructure/llmops/compose.ops.yaml -f infrastructure/llmops/compose.artifacts.yaml -f infrastructure/llmops/compose.auth-test.yaml --profile evaluation down
       - name: Stop this job's initial web proxy before Kubernetes verification
