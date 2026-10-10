@@ -1,3 +1,4 @@
+{{- include "govbiz-data.validate" . -}}
 {{- if .Values.rabbitmq.enabled }}
 apiVersion: v1
 kind: Service
@@ -72,10 +73,18 @@ spec:
             failureThreshold: 3
           volumeMounts:
             - {name: data, mountPath: /var/lib/rabbitmq}
+      {{- if not .Values.allowDisposableData }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.existingClaims.rabbitmq | quote }}
+      {{- end }}
+  {{- if .Values.allowDisposableData }}
   volumeClaimTemplates:
     - metadata: {name: data}
       spec:
         accessModes: [ReadWriteOnce]
         resources:
           requests: {storage: 1Gi}
+  {{- end }}
 {{- end }}

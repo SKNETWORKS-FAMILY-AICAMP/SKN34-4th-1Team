@@ -1,6 +1,8 @@
 # 환경별 배포 상태
 
-상태: **`local-msa/`에 Core·Catalog·AI·Ops의 독립 Helm values를 구현했다.**
+상태: **`local-msa/`에 Core·Catalog·AI·Ops·정적 웹의 독립 Helm values를 구현했다.**
+[`in-cluster/`](in-cluster/README.md)는 검증된 이미지와 함께 사용하는 Kubernetes 내부 연결 overlay다.
+Ops·평가·Langfuse 연결, 정적 웹 origin, 외부 복원 PVC 참조를 제공하며 실제 클러스터에 자동 적용하지 않는다.
 템플릿은 `../charts/`에 있으며, `../argocd/local/`의 Application이 각 values를 참조한다.
 기존 `services/ops-service/base`·`local/ops-service`·`local/ops-mysql`은 Ops 단독 Kustomize 검증용으로 유지한다.
 클라우드 운영 클러스터·`prod` overlay는 없으며 EKS를 생성하지 않는다.
@@ -27,7 +29,8 @@
 | 비밀·데이터 | 비밀 저장소 참조, 소유 DB·스토리지·백업 정책; 실제 비밀값은 제외 |
 | 복구 조건 | 이전 승인 digest, API·DB migration 호환성, 데이터 복구 제한 |
 
-Ops 단독 검증은 Kustomize, 네 서비스 전체 검증은 Helm을 사용하며 DB 설정은 로컬 검증에만 둔다.
+Ops 단독 검증은 Kustomize, 서비스 전체 검증은 Helm을 사용한다. 테스트용 DB 생성과
+`in-cluster`의 기존 복원 PVC 연결은 별도 모드이며 함께 선택할 수 없다.
 같은 대상 리소스에 두 방식을 동시에 적용하지 않는다.
 local의 `govbiz-ops-service:local-k8s`는 registry에서 다운로드하는 운영 릴리스가 아니라,
 smoke가 검증한 로컬 고유 이미지 태그로 교체하고 kind에 적재하는 자리다.

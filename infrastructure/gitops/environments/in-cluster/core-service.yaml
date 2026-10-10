@@ -1,0 +1,13 @@
+localMode: false
+image: {tag: "", digest: "", pullPolicy: IfNotPresent}
+env:
+  # Browser-facing loopback origin of the static Kubernetes web, not a Pod address.
+  APP_CORS_ALLOWED_ORIGIN: http://localhost:18173
+  ACCOUNT_OAUTH_CALLBACK_BASE_URL: http://localhost:18173
+  ACCOUNT_OAUTH_FRONTEND_BASE_URL: http://localhost:18173
+  DAILY_REPORT_FRONTEND_BASE_URL: http://localhost:18173
+  LANGFUSE_ENABLED: "true"
+  LANGFUSE_BASE_URL: http://langfuse-web.govbiz-observability.svc.cluster.local:3000
+  LANGFUSE_ENVIRONMENT: development
+secretName: core-runtime
+secretKeys: [SPRING_DATASOURCE_PASSWORD, ACCOUNT_JWT_SECRET, CATALOG_INTERNAL_TOKEN, DOCUMENT_INTERNAL_TOKEN, ASSISTANT_TOOLS_TOKEN, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY]

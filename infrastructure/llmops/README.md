@@ -2,6 +2,10 @@
 
 [전략 문서](../../docs/langfuse-adoption-strategy.md) · [근거 답변 평가](../../evaluation/support-program-evidence/README.md)
 
+Kubernetes 배포는 [내부 연결 values](../gitops/environments/in-cluster/README.md)를 기준으로 Ops·Prefect·
+평가 실행기·결과 서버·Langfuse를 연결합니다. 아래 Compose 명령과 과거 실행 기록은 로컬 개발·검증용으로 유지합니다.
+설정 추가만으로 현재 실행 중인 Compose나 데이터가 이전되지는 않습니다.
+
 구현 범위는 근거 답변 추적, **저장 응답 재평가·승인 기반 새 응답 생성 파이프라인**, React·Django 운영 화면과 관리자 응답 검토·비교 기준 지정·실패 후처리 복구다.
 Langfuse 4.15.6, Prefect 3.8.6, pandas 3.0.6, Pandera 0.33.1, Evidently 0.7.23을
 AI Service의 `uv.lock`으로 고정한다. 요청 처리에는 Langfuse만 설치하고 나머지는 `evaluation` 그룹으로 설치한다.
