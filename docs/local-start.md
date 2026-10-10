@@ -1,10 +1,21 @@
 # 로컬 시작 가이드
 
-GovBiz의 통합 Compose 실행과 웹·모바일 개발 환경을 준비하는 방법입니다.
+GovBiz의 Kubernetes 실행 구성과 선택적 Compose·웹·모바일 개발 환경을 준비하는 방법입니다.
 서비스 역할과 연결 구조는 [메인 README의 시스템 아키텍처](../README.md#서비스-구성)를 참고하세요.
 아래 파일 경로와 명령의 기준은 저장소 루트입니다.
 
-## 통합 Compose
+## Kubernetes 기준 구성
+
+새 배포 설정은 [Kubernetes 내부 연결·기존 PVC 안내](../infrastructure/gitops/environments/in-cluster/README.md)를
+기준으로 준비합니다. 웹·Core·Catalog·AI·Ops는 서비스별 Chart, Prefect·평가 실행기·결과 서버와
+Langfuse는 기존 전용 Chart를 사용합니다. 서비스 간 요청은 클러스터 내부 DNS로 연결합니다.
+데이터는 저장소별 복원 PVC를 지정하며, 실제 데이터 이전·클러스터 적용은 별도로 수행합니다.
+
+코드를 수정하며 테스트용 kind를 새로 만드는 절차는 [개인 Kubernetes 개발 안내](local-fork-development.md)를
+따릅니다. 기존 데이터가 있는 환경에 빈 테스트 DB 초기화를 그대로 적용하지 않습니다.
+정적 웹의 기본 접속 주소는 `http://localhost:18173`, Vite 개발 화면은 기존 `5173`입니다.
+
+## 선택적 통합 Compose 개발
 
 루트 `compose.yaml`이 Core·Catalog·AI·Ops와 웹·저장소를 연결합니다.
 `infrastructure/compose.yaml`만 단독 실행하는 방식은 기존 embedded 수집 호환 경로입니다.

@@ -1,6 +1,11 @@
-# Ops와 Compose 평가 실행 환경의 연결 계약
+# Ops와 평가 실행 환경의 연결 계약
 
-현재 개인 환경은 Kubernetes Ops API/sync와 Compose Prefect·평가 실행기·결과 저장소를 연결한다.
+Kubernetes 기준 연결은 [in-cluster 설정](../environments/in-cluster/README.md)을 사용한다.
+Ops API/sync가 Prefect·결과 서버의 내부 Service를 조회하므로 호스트 중계나 Compose 볼륨 마운트가 필요 없다.
+아래 Compose 연결은 이전 기간과 선택적 로컬 개발의 계약이며, 현재 실행 상태를 뜻하지 않는다.
+별도 환경의 실제 이전 기록은 [평가 Kubernetes 이전](evaluation-kubernetes.md)에 있다.
+
+기존 혼합 환경은 Kubernetes Ops API/sync와 Compose Prefect·평가 실행기·결과 저장소를 연결했다.
 2026-10-08 사용자가 전체 실행 구성의 Kubernetes 통합을 최종 배포 목표로 확정했다.
 이 연결 계약은 로컬 개발과 이전 기간에 사용한다. 배포 환경에서는 Compose 의존을 제거해야 하며,
 독립 배포 구성·저장소 이전 순서는 [Kubernetes 통합 안내](evaluation-kubernetes.md)를 따른다.

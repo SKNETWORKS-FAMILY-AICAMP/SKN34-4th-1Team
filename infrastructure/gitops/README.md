@@ -5,6 +5,14 @@
 필수 CI와 이미지 발행 검증은 유지합니다. [제거 범위와 현재 상태](docs/deployment-candidates.md)를 참고하세요.
 LLMOps 개발 순서는 [후속 개발 전략](../../docs/llmops-next-development-plan.md)을 따릅니다.
 
+## Compose 없이 연결하는 배포 설정
+
+[in-cluster values](environments/in-cluster/README.md)는 기존 Chart에 적용하는 Kubernetes 내부 연결 설정입니다.
+Ops·Prefect·결과 서버·Langfuse를 Service DNS로 연결하고, Core·AI의 추적과 정적 웹의 접속 주소를 맞춥니다.
+업무용 MySQL·Redis·Qdrant·Elasticsearch와 선택적 RabbitMQ는 복원된 기존 PVC를 참조할 수 있습니다.
+PVC·Secret·검증된 이미지가 준비되기 전에는 배포하지 않으며, 이 설정 추가를 실제 이전 완료로 취급하지 않습니다.
+기존 무료 로컬 초기화와 Compose 개발 경로는 명시적으로 선택할 때 계속 사용할 수 있습니다.
+
 ## 최종 배포 목표와 완료 기준
 
 **최종 목표는 우리가 운영하는 전체 실행 구성을 Kubernetes로 통일하는 것입니다.**
@@ -25,7 +33,8 @@ Kubernetes와 Compose를 함께 쓰는 구조는 로컬 개발용이며, 현재 
 로컬 개발용 Compose는 유지하며 원본 볼륨 삭제는 별도의 데이터 보존 판단입니다.
 OpenAI·공공 데이터 등 외부 API는 기존 서비스 계약을 유지합니다.
 
-현재 `govbiz-local-data`는 로컬 검증용이므로 운영 데이터 구성의 완료 증거로 사용하지 않습니다.
+`govbiz-local-data`는 테스트용 새 PVC와 외부에서 복원한 기존 PVC 연결을 지원하는 단일 노드 구성입니다.
+기존 PVC 모드도 운영 HA·백업·실제 데이터 이전 완료의 증거는 아닙니다.
 개인 환경의 평가 저장소·실행기·Ops 연결은 2026-10-10에 실제 전환했습니다.
 새 Kubernetes 평가 데이터의 암호화 백업·격리 복원까지 완료했습니다. Langfuse와 관련 저장소
 6개도 실제 전환해 원본 Compose 중지 상태에서 무료 평가·점수 저장·보고서 조회를 확인했습니다.

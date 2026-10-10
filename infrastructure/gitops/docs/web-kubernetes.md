@@ -4,6 +4,9 @@
 별도 웹 Chart 없이 기존 `govbiz-service` Chart의 Deployment·ClusterIP Service를 사용한다.
 개발용 Compose·Vite와 기존 Vercel 배포는 유지한다.
 
+Core·Ops의 웹 origin과 내부 평가·추적 연결은 [in-cluster values](../environments/in-cluster/README.md)를
+함께 사용한다. 웹 overlay는 검증된 이미지 digest를 요구하며 기본 브라우저 주소는 `http://localhost:18173`이다.
+
 ## 실행 경로
 
 `브라우저 → web:8080 → 정적 SPA 또는 Core/Ops 내부 Service`

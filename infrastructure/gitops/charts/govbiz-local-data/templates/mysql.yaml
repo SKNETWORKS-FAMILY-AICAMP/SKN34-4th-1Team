@@ -1,6 +1,4 @@
-{{- if not .Values.allowDisposableData }}
-{{- fail "This chart is only for explicitly approved disposable local data" }}
-{{- end }}
+{{- include "govbiz-data.validate" . -}}
 {{- range $name, $db := .Values.databases }}
 ---
 apiVersion: v1
@@ -74,10 +72,18 @@ spec:
             failureThreshold: 5
           volumeMounts:
             - {name: data, mountPath: /var/lib/mysql}
+      {{- if not $.Values.allowDisposableData }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ index $.Values.existingClaims (printf "%s-mysql" $name) | quote }}
+      {{- end }}
+  {{- if $.Values.allowDisposableData }}
   volumeClaimTemplates:
     - metadata: {name: data}
       spec:
         accessModes: [ReadWriteOnce]
         resources:
           requests: {storage: 1Gi}
+  {{- end }}
 {{- end }}

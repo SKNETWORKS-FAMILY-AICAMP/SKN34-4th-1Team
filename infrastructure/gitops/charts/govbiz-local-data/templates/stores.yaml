@@ -1,3 +1,4 @@
+{{- include "govbiz-data.validate" . -}}
 {{- range $name, $store := .Values.stores }}
 ---
 apiVersion: v1
@@ -65,10 +66,18 @@ spec:
             failureThreshold: 5
           volumeMounts:
             - {name: data, mountPath: {{ $store.directory }}}
+      {{- if not $.Values.allowDisposableData }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ index $.Values.existingClaims $name | quote }}
+      {{- end }}
+  {{- if $.Values.allowDisposableData }}
   volumeClaimTemplates:
     - metadata: {name: data}
       spec:
         accessModes: [ReadWriteOnce]
         resources:
           requests: {storage: 1Gi}
+  {{- end }}
 {{- end }}

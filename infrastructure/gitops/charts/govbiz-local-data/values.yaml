@@ -1,4 +1,8 @@
 allowDisposableData: false
+# Restored PVC references only. Mutually exclusive with disposable volumes.
+# Keys: core-mysql, catalog-mysql, ops-mysql, redis, qdrant, elasticsearch
+# and rabbitmq when enabled. Retained data also requires immutable image digests.
+existingClaims: {}
 rabbitmq:
   enabled: false
   image: rabbitmq:4.3.5-management-alpine

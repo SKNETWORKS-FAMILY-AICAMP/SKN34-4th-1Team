@@ -1,6 +1,7 @@
-# GovBiz Docker Compose
+# GovBiz 실행 인프라
 
 Kubernetes·Helm·Argo CD 설정은 같은 저장소의 [`gitops/`](gitops/README.md)에 있습니다.
+새 배포의 내부 서비스 연결과 기존 데이터 PVC는 [Kubernetes 구성 안내](gitops/environments/in-cluster/README.md)를 사용합니다.
 이 문서는 기존 Compose 실행 경로를 설명하며, 교육기관 저장소의 GHCR 발행·팀원별 Kubernetes 자동 설정을 뜻하지 않습니다.
 
 공고 수집을 별도 프로세스·DB로 분리한 선택 경로는 `compose.catalog.yaml` overlay와
