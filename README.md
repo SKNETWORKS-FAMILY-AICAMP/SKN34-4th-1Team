@@ -841,7 +841,7 @@ Core HTTP의 저장 실행 기록도 요청·원문·검색·인용을 대조한
 
 ### 9.4 운영 화면에서 할 수 있는 일
 
-**실행·진행 관리:** 수동 평가와 활성화된 정기 평가는 같은 실행 조건·예산 검사를 거칩니다.
+<img src="docs/assets/readme/evaluation-management-caption.svg" alt="실행·진행 관리 — 수동 평가와 활성화된 정기 평가는 같은 실행 조건·예산 검사를 거칩니다." width="820">
 
 ```mermaid
 flowchart LR
@@ -859,8 +859,7 @@ flowchart LR
     class Run,Cancel execution
 ```
 
-**결과 확인·검토·복구:** 완료된 결과를 검토하고 합격한 실행을 비교 기준으로 지정합니다.
-응답이 저장된 후 보고서·점수 등록만 실패했다면, 캡처를 검증해 후처리를 복구할 수 있습니다.
+<img src="docs/assets/readme/evaluation-recovery-caption.svg" alt="결과 확인·검토·복구 — 완료된 결과를 검토하고 합격한 실행을 비교 기준으로 지정합니다. 응답이 저장된 후 보고서·점수 등록만 실패했다면, 캡처를 검증해 후처리를 복구할 수 있습니다." width="820">
 
 ```mermaid
 flowchart LR
