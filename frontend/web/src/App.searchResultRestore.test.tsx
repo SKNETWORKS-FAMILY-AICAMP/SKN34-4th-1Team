@@ -9,6 +9,7 @@ import App from './App'
 import { appContainer } from './app/appContainer'
 import { createAppStore } from './app/store'
 import { supportPrograms } from './data/fixtures/supportPrograms'
+import { supportProgramClient } from './data/api/supportProgramClient'
 import type { Account } from './domain/entities/Account'
 import { emptyConversationContext, readyConversationProposal, seoulConversationContext } from './data/fixtures/supportProgramConversation'
 import { interpretationStarted } from './presentation/features/chat/state/chatSlice'
@@ -183,6 +184,10 @@ describe('회원 검색에 도착한 비회원 미리보기의 전체 공개', (
 async function startSearch(currentAccount: Account | null) {
   vi.spyOn(appContainer.resolve('interpretSupportProgramConversationUseCase'), 'execute')
     .mockResolvedValue(readyConversationProposal(seoulConversationContext))
+  if (currentAccount?.role === 'ADMIN') {
+    vi.spyOn(supportProgramClient, 'sendGovAgentMessage')
+      .mockResolvedValue({ outcome: 'SEARCH', interpretation: readyConversationProposal(seoulConversationContext) })
+  }
   const store = createAppStore()
   store.dispatch(sessionRestored(currentAccount))
   render(<Provider store={store}><MemoryRouter initialEntries={[currentAccount ? '/app/chat' : '/']}>

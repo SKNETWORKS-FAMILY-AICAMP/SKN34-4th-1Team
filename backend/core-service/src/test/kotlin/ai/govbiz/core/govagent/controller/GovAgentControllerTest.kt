@@ -5,6 +5,7 @@ import ai.govbiz.core.account.domain.AccountRole
 import ai.govbiz.core.account.helper.AccountTestHelper
 import ai.govbiz.core.account.service.AccountSessionService
 import ai.govbiz.core.admin.web.AdminPrincipalArgumentResolver
+import ai.govbiz.core.govagent.domain.GovAgentProgram
 import ai.govbiz.core.govagent.domain.GovAgentQuestion
 import ai.govbiz.core.govagent.service.GovAgentService
 import ai.govbiz.core.govagent.service.dto.GovAgentOutcome
@@ -48,6 +49,28 @@ class GovAgentControllerTest {
             .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk())
             .andExpect(header().string("Cache-Control", "no-store"))
             .andExpect(jsonPath("$.outcome").value("NEEDS_PROGRAM"))
+    }
+
+    @Test
+    fun applicationResponseKeepsTheSelectedCompositeIdentityAndPreparationMessage() {
+        doReturn(admin).`when`(sessions).requireAccount("test-session")
+        val program = GovAgentProgram("KSTARTUP", "P001")
+        val question = GovAgentQuestion("신청서 작성해 줘", SupportProgramConversationContext(null, true, SupportProgramCompanyConditions()), null, null, null, program)
+        val message = "신청서를 선택한 뒤 양식 분석과 초안 작성 버튼을 눌러 주세요."
+        doReturn(GovAgentResult(GovAgentOutcome.APPLICATION, program = program, message = message))
+            .`when`(service).answer(admin, "127.0.0.1", question)
+        val request = body.replace("지원 대상은?", question.message)
+            .replace("\"selectedProgram\":null", "\"selectedProgram\":{\"sourceCode\":\"KSTARTUP\",\"sourceProgramId\":\"P001\"}")
+
+        mvc.perform(post("/api/v1/gov-agent/messages").header("Authorization", "Bearer test-session")
+            .contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.outcome").value("APPLICATION"))
+            .andExpect(jsonPath("$.program.sourceCode").value("KSTARTUP"))
+            .andExpect(jsonPath("$.program.sourceProgramId").value("P001"))
+            .andExpect(jsonPath("$.message").value(message))
+            .andExpect(jsonPath("$.interpretation").isEmpty())
+            .andExpect(jsonPath("$.evidence").isEmpty())
     }
 
     @Test

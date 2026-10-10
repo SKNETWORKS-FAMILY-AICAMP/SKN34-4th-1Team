@@ -76,6 +76,34 @@ class GovAgentServiceTest {
     }
 
     @Test
+    fun applicationReturnsSelectedCompositeIdentityWithoutExecutingOrCharging() {
+        decide("APPLICATION")
+        val selected = GovAgentProgram("KSTARTUP", "P001")
+        val result = service.answer(admin, "127.0.0.1", question(selected))
+
+        assertEquals(GovAgentOutcome.APPLICATION, result.outcome)
+        assertEquals(selected, result.program)
+        assertNull(result.interpretation)
+        assertNull(result.evidence)
+        assertTrue(!result.message.isNullOrBlank())
+        verifyNoInteractions(conversation, evidence, usage)
+    }
+
+    @Test
+    fun applicationWithoutSelectionAsksForProgramWithoutExecutingOrCharging() {
+        decide("APPLICATION", selected = false)
+        val result = service.answer(admin, "127.0.0.1", question(null))
+
+        assertEquals(GovAgentOutcome.NEEDS_PROGRAM, result.outcome)
+        assertNull(result.program)
+        assertNull(result.interpretation)
+        assertNull(result.evidence)
+        assertTrue(result.message!!.contains("신청서"))
+        assertTrue(result.message.contains("공고"))
+        verifyNoInteractions(conversation, evidence, usage)
+    }
+
+    @Test
     fun unsupportedRequestsDoNotExecuteAnyFeature() {
         decide("UNSUPPORTED")
         assertEquals(GovAgentOutcome.UNSUPPORTED, service.answer(admin, "127.0.0.1", question()).outcome)

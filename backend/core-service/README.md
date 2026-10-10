@@ -52,13 +52,16 @@ private RDS TLS 검증, Secure 쿠키, 개발 로그인 비활성화, Nginx 고�
 요청은 기존 조건 해석 계약인 `conversation`과 선택한 공고의 복합 식별자 `selectedProgram`(nullable)입니다.
 `Controller → GovAgentService → AiGovAgentClient → AI supervisor`에서 경로를 선택한 뒤
 동일 Service가 기존 `SupportProgramConversationService` 또는 `SupportProgramEvidenceService`를 실행합니다.
-응답 `outcome`은 `SEARCH`(interpretation), `EVIDENCE`(program·evidence), `NEEDS_PROGRAM` 또는 `UNSUPPORTED`(message)입니다.
+응답 `outcome`은 `SEARCH`(interpretation), `EVIDENCE`(program·evidence), `APPLICATION`(program·message),
+`NEEDS_PROGRAM` 또는 `UNSUPPORTED`(message)입니다.
 
 검색은 조건 제안까지만 반환하며 확인 후 기존 검색 API가 `AI_SEARCH` 사용량을 집행합니다.
 원문 답변은 기존 `PlanUsageService.consume(EVIDENCE_QUESTION)`에서 처리하므로 실패 시 사용량 반환도 유지합니다.
 공유 요청 제한을 적용하고 응답은 `no-store`입니다. AI에 계정 ID·권한·임의 도구 URL을 전달하지 않으며,
 분류용 문장의 개인 식별 정보는 기존 마스킹을 재사용합니다. 알 수 없는 AI action과 upstream 오류는 명시적인 오류입니다.
-새 DB·migration·실행 서비스는 필요하지 않습니다. 신청 문서·중복 검토 등은 아직 이 대화 API에 연결하지 않았습니다.
+`APPLICATION`은 사용자가 선택한 복합 식별자와 신청 준비 안내만 반환합니다. 선택이 없으면 `NEEDS_PROGRAM`이며 양식 분석·준비 건 생성·사용량 차감은 하지 않습니다.
+웹의 신청 준비 카드가 기존 `application-preparations` API를 재사용합니다. 분석·작성은 버튼으로 명시적으로 실행하며 기존 소유권·작업 큐·사용량 경계를 유지합니다.
+새 DB·migration·실행 서비스는 필요하지 않습니다. 중복 검토 등 나머지 기능은 아직 이 대화 API에 연결하지 않았습니다.
 
 ## 계정별 대화 기록
 

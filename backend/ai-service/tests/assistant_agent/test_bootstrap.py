@@ -8,6 +8,7 @@ import app.bootstrap as bootstrap_module
 from app.assistant_agent.service import AssistantAgentService
 from app.bootstrap import build_application_container
 from app.config import Settings, SettingsConfigurationError
+from app.gov_agent.agent import GovAgentSupervisor
 
 
 SETTINGS = Settings(
@@ -56,7 +57,7 @@ async def test_agent_models_tool_client_and_service_are_wired_and_closed(monkeyp
         assert isinstance(container.assistant_agent_service, AssistantAgentService)
         assert container.assistant_agent_service._tracing is container.llm_tracing
         assert container.assistant_agent_service._timeout_seconds == 15.0
-        general, ranking, application, combination, classify, agent = FakeChatOpenAI.instances
+        general, ranking, application, combination, classify, agent, supervisor = FakeChatOpenAI.instances
         assert application.kwargs["root_async_client"] is client
         assert application.kwargs["timeout"] == 1.25
         assert application.kwargs["max_retries"] == 0
@@ -68,6 +69,10 @@ async def test_agent_models_tool_client_and_service_are_wired_and_closed(monkeyp
                                    "reasoning": {"effort": "low"}, "timeout": 1.25, "max_retries": 0}
         assert agent.kwargs == {"model": "gpt-5.6-sol", "api_key": "private-key", "use_responses_api": True, "store": False,
                                 "reasoning": {"effort": "low"}, "timeout": 1.25, "max_retries": 0}
+        assert isinstance(container.gov_agent_supervisor, GovAgentSupervisor)
+        assert container.gov_agent_supervisor._model.bound is supervisor
+        assert supervisor.kwargs == {"model": "gpt-5-nano", "api_key": "private-key", "use_responses_api": True, "store": False,
+                                     "reasoning": {"effort": "none"}, "timeout": 1.25, "max_retries": 0}
         tool_client = container.assistant_tool_client
         assert tool_client is not None and tool_client.enabled
         assert str(tool_client._client.base_url) == "http://core-service:8080"
@@ -90,8 +95,10 @@ async def test_supplied_agent_service_skips_model_and_client_construction(monkey
     try:
         assert container.assistant_agent_service is service
         assert container.assistant_tool_client is None
-        assert len(FakeChatOpenAI.instances) == 4
-        assert FakeChatOpenAI.instances[3].kwargs["max_tokens"] == 6000
+        general, ranking, application, combination, supervisor = FakeChatOpenAI.instances
+        assert combination.kwargs["max_tokens"] == 6000
+        assert isinstance(container.gov_agent_supervisor, GovAgentSupervisor)
+        assert container.gov_agent_supervisor._model.bound is supervisor
     finally:
         await container.close()
     assert client.closed

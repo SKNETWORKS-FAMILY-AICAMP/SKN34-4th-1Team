@@ -15,7 +15,7 @@ import ai.govbiz.core.supportprogram.service.conversation.SupportProgramConversa
 import ai.govbiz.core.supportprogram.service.evidence.SupportProgramEvidenceService
 import org.springframework.stereotype.Service
 
-/** 한 턴에 한 업무만 위임한다. 검색은 조건 제안까지만 준비하고 사용자 확인 뒤 기존 검색 API가 실행한다. */
+/** 한 턴에 한 업무만 위임한다. 검색·신청 준비는 안내 뒤 사용자의 명시적인 실행을 기다린다. */
 @Service
 class GovAgentService(
     private val client: AiGovAgentClient,
@@ -36,7 +36,7 @@ class GovAgentService(
             ))
             "EVIDENCE" -> {
                 val program = question.selectedProgram ?: return GovAgentResult(
-                    GovAgentOutcome.NEEDS_PROGRAM, message = "검색 결과에서 ‘이 공고 질문’을 눌러 공고를 선택한 뒤 질문해 주세요.",
+                    GovAgentOutcome.NEEDS_PROGRAM, message = "검색 결과에서 공고를 선택한 뒤 질문해 주세요.",
                 )
                 // AI가 만든 공고 ID·URL로 호출하지 않는다. 사용자가 선택한 복합 식별자로 기존 근거 검증을 거친다.
                 val evidence = planUsageService.consume(account, clientIp, PlanUsageFeature.EVIDENCE_QUESTION) {
@@ -44,8 +44,15 @@ class GovAgentService(
                 }
                 GovAgentResult(GovAgentOutcome.EVIDENCE, evidence = evidence, program = program)
             }
+            "APPLICATION" -> {
+                val program = question.selectedProgram ?: return GovAgentResult(
+                    GovAgentOutcome.NEEDS_PROGRAM, message = "신청서를 준비할 공고를 검색 결과에서 선택한 뒤 요청해 주세요.",
+                )
+                GovAgentResult(GovAgentOutcome.APPLICATION, program = program,
+                    message = "신청 양식과 지원 분야를 확인한 뒤 작성을 시작해 주세요. 저장된 양식이 없으면 분석을 요청할 수 있습니다.")
+            }
             "UNSUPPORTED" -> GovAgentResult(GovAgentOutcome.UNSUPPORTED,
-                message = "현재 Gov 에이전트에서는 지원사업 검색과 선택한 공고의 원문 질문을 처리합니다. 신청서 작성·비교·저장 등 다른 기능은 해당 화면에서 이용해 주세요. 여러 작업은 하나씩 요청해 주세요.")
+                message = "현재 Gov 에이전트에서는 지원사업 검색, 선택한 공고의 원문 질문과 신청서 준비를 지원합니다. 외부 기관 제출·삭제·여러 작업 일괄 실행은 지원하지 않습니다. 비교·저장 등 다른 기능은 해당 화면에서 이용해 주세요.")
             else -> throw AiServiceCallException.invalidResponse("Unknown Gov agent action", null)
         }
     }

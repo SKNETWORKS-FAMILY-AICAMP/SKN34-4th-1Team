@@ -13,17 +13,25 @@ from app.gov_agent.router import get_supervisor, router
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("action", ["SEARCH", "EVIDENCE", "UNSUPPORTED"])
-async def test_one_bounded_decision_without_executing_tools(action):
+@pytest.mark.parametrize("action,message,has_selected_program", [
+    ("SEARCH", "창업 지원사업 찾아줘", False),
+    ("EVIDENCE", "이 공고 제출서류 뭐야?", True),
+    ("APPLICATION", "이 공고 신청서 작성해 줘", True),
+    ("APPLICATION", "신청서 양식 분석해 줘", False),
+    ("UNSUPPORTED", "외부 기관에 신청서 제출해 줘", True),
+])
+async def test_one_bounded_decision_without_executing_tools(action, message, has_selected_program):
     model = ResponsesChatStub([[response_message(json.dumps({"action": action}))]])
     supervisor = GovAgentSupervisor(model=model.model, timeout_seconds=3)
-    request = GovAgentRequest(message="이 공고 신청 방법은?", hasSelectedProgram=True)
+    request = GovAgentRequest(message=message, hasSelectedProgram=has_selected_program)
     assert (await supervisor.decide(request)).action == action
     call = model.first_call
     assert call.body["store"] is False
     assert call.timeout == 3
     assert len(model.calls) == 1
-    assert json.loads(call.input[0]["content"])["hasSelectedProgram"] is True
+    assert json.loads(call.input[0]["content"])["hasSelectedProgram"] is has_selected_program
+    assert call.schema["properties"]["action"]["enum"] == ["SEARCH", "EVIDENCE", "APPLICATION", "UNSUPPORTED"]
+    assert not call.body.get("tools")
     model.assert_complete()
 
 

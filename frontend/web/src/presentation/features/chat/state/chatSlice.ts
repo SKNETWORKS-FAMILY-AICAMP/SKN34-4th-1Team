@@ -1,5 +1,5 @@
 import { createSelector, createSlice, nanoid, type PayloadAction } from '@reduxjs/toolkit'
-import type { GovAgentEvidence, GovAgentProgram } from '@govbiz/shared/domain/entities/GovAgent'
+import type { GovAgentApplication, GovAgentEvidence, GovAgentProgram } from '@govbiz/shared/domain/entities/GovAgent'
 
 import type { RootState } from '../../../../app/store'
 import type { ChatConversationSnapshot, ChatMessage, ChatSearchOptions } from '../../../../domain/entities/ChatConversation'
@@ -135,10 +135,11 @@ const chatSlice = createSlice({
       state.govProgram = program
       if (state.interpretation.status === 'failed') state.interpretation = { status: 'idle' }
     },
-    govMessageSucceeded(state, action: PayloadAction<{ requestId: string; message: string; evidence?: GovAgentEvidence }>) {
+    govMessageSucceeded(state, action: PayloadAction<{ requestId: string; message: string; evidence?: GovAgentEvidence; application?: GovAgentApplication }>) {
       if (state.interpretation.status !== 'pending' || state.interpretation.requestId !== action.payload.requestId) return
       state.messages.push({ id: `${action.payload.requestId}-answer`, role: 'assistant', text: action.payload.message,
-        ...(action.payload.evidence ? { govEvidence: action.payload.evidence } : {}) })
+        ...(action.payload.evidence ? { govEvidence: action.payload.evidence } : {}),
+        ...(action.payload.application ? { govApplication: action.payload.application } : {}) })
       state.interpretation = { status: 'idle' }
       state.unseenOutcome = 'interpretation-answered'
     },

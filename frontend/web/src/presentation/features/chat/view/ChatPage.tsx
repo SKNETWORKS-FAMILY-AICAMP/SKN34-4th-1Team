@@ -1,8 +1,12 @@
 import type { FormEvent } from 'react'
 import { flushSync } from 'react-dom'
+import { Link } from 'react-router'
 
+import { useAppSelector } from '../../../../app/hooks'
 import type { SupportProgramSearchReadiness } from '../../../../domain/entities/SupportProgramSearchReadiness'
 import { PlanUsageLine } from '../../../shared/plan-usage/PlanUsageLine'
+import { appPaths } from '../../../shared/routes/appPaths'
+import { ApplicationPreparationInline } from '../../application-preparation/view/ApplicationPreparationInline'
 import { useChatPageViewModel } from '../viewmodel/useChatPageViewModel'
 import { companyConditionFields } from '../viewmodel/chatConversationProposal'
 import { ConversationProposal } from './ConversationProposal'
@@ -20,6 +24,7 @@ import {
 export type ChatPageLayout = 'landing' | 'workspace'
 
 export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
+  const accountEmail = useAppSelector((state) => state.auth.account?.email)
   const {
     isGovAgent,
     govProgram,
@@ -65,6 +70,8 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
   const isLandingIntro = layout === 'landing' && conversationCount === 0
   const isDockedLanding = layout === 'landing' && !isLandingIntro
   const isGuest = layout === 'landing'
+  // 저장된 대화에도 신청 준비 안내는 남기되 가장 최근 카드 하나만 조회·분석 상태를 이어받습니다.
+  const latestApplicationMessageId = messages.reduce<string | null>((latest, message) => message.govApplication ? message.id : latest, null)
 
   /**
    * 공개 첫 화면의 첫 전송은 소개가 사라지고 입력창이 아래로 내려가는 큰 전환이라 View Transition으로 잇습니다.
@@ -117,7 +124,7 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onKeyDown={handleInputKeyDown}
-          placeholder={isGovAgent ? '지원사업을 찾거나 선택한 공고에 대해 질문해 주세요.' : isLandingIntro
+          placeholder={isGovAgent ? '지원사업 검색, 공고 질문, 신청 준비를 요청해 주세요.' : isLandingIntro
             ? '예: 서울에서 AI 서비스를 만드는 창업기업입니다. 사업화 지원을 받을 수 있을까요?'
             : isDockedLanding ? '지원사업·조건을 입력해 주세요.'
               : '찾고 싶은 지원사업이나 변경할 조건을 알려주세요.'}
@@ -228,7 +235,7 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
                   <EvidenceQuestionFeedback compact state={message.govEvidence.answer.answerStatus === 'ANSWERED'
                     ? { status: 'answered', answer: message.govEvidence.answer } : { status: 'insufficient-evidence' }} />
                 </> : isGovAgent && index === 0
-                  ? '안녕하세요. Gov 에이전트입니다. 지원사업을 검색하고, 결과에서 공고를 선택하면 같은 대화에서 원문 근거로 답변해 드립니다.'
+                  ? '안녕하세요. Gov 에이전트입니다. 지원사업을 검색하고, 공고를 선택하면 같은 대화에서 원문 질문과 신청 준비를 도와드립니다.'
                   : message.text}
                 {retrySearch || retryInterpretation ? (
                   <div className={chatPageStyles.messageActions}>
@@ -239,6 +246,16 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
                   </div>
                 ) : null}
               </div>
+              {message.govApplication ? (isGovAgent && layout === 'workspace' && message.id === latestApplicationMessageId
+                && govProgram?.sourceCode === message.govApplication.program.sourceCode
+                && govProgram.sourceProgramId === message.govApplication.program.sourceProgramId
+                ? <ApplicationPreparationInline key={`${accountEmail}:${message.id}`} program={message.govApplication.program} />
+                : <div className="mt-3 rounded-xl border border-line p-4 text-sm">
+                  <p className="mb-2 font-semibold">신청 준비 · {message.govApplication.program.title}</p>
+                  <Link className="text-brand-primary underline" to={`${appPaths.applicationPreparationNew}?${new URLSearchParams({
+                    sourceCode: message.govApplication.program.sourceCode, sourceProgramId: message.govApplication.program.sourceProgramId,
+                  })}`}>신청 준비 화면에서 이어서 보기</Link>
+                </div>) : null}
               {message.searchOptions && isUser ? (
                 <div>
                   <p className={chatPageStyles.searchSnapshot}>검색 당시 조건: {formatSearchOptions(message.searchOptions)}</p>
@@ -320,9 +337,9 @@ export function ChatPage({ layout = 'landing' }: { layout?: ChatPageLayout }) {
           <form className={chatPageStyles.composerWorkspace} onSubmit={handleSubmit}>
             {isGovAgent ? <div className="px-3 py-2 text-sm text-ink-muted">
               {govProgram ? <div className="flex items-center justify-between gap-3 rounded-xl bg-brand-soft p-3">
-                <span>질문할 공고: <strong className="text-ink">{govProgram.title}</strong></span>
+                <span>선택한 공고: <strong className="text-ink">{govProgram.title}</strong></span>
                 <button type="button" disabled={isBusy} className="shrink-0 underline" onClick={() => selectGovProgram(null)}>선택 해제</button>
-              </div> : <p>검색 결과의 ‘이 공고 질문’으로 원문 답변을 이어갈 수 있습니다.</p>}
+              </div> : <p>검색 결과에서 ‘이 공고 선택’을 누르면 원문 질문과 신청 준비를 이어갈 수 있습니다.</p>}
               {evidenceUsage ? <PlanUsageLine view={evidenceUsage} className="mt-2" /> : null}
             </div> : null}
             {readinessNotice}

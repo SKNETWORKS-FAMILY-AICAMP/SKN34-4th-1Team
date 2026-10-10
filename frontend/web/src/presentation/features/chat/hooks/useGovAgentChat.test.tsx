@@ -72,11 +72,28 @@ describe('관리자 Gov 에이전트 대화', () => {
     let request!: Promise<void>
     act(() => { request = hook.result.current.submitMessage() })
     act(() => hook.result.current.startNewConversation())
-    await act(async () => { resolve({ outcome: 'EVIDENCE', program, evidence }); await request })
+    await act(async () => { resolve({ outcome: 'APPLICATION', program, message: '신청 준비를 시작해 주세요.' }); await request })
     expect(hook.result.current.messages).toHaveLength(1)
     expect(hook.result.current.govProgram).toBeNull()
     act(() => hook.store.dispatch(signedOut()))
     expect(hook.result.current.isGovAgent).toBe(false)
+  })
+
+  it('saves and restores application requests without creating a document or rerouting the request', async () => {
+    const hook = setup()
+    await searchAndSelect(hook)
+    const application = { program, message: '양식을 골라 신청 준비를 시작해 주세요.' }
+    hook.gov.mockResolvedValue({ outcome: 'APPLICATION', ...application })
+    act(() => hook.result.current.updateDraft('이 공고 신청 준비해줘'))
+    await act(async () => hook.result.current.submitMessage())
+    expect(hook.result.current.messages.at(-1)?.govApplication).toEqual(application)
+    const snapshot = chatConversationSnapshotSchema.parse(createChatConversationSnapshot(hook.store.getState().chat))
+    act(() => hook.result.current.startNewConversation())
+    act(() => hook.store.dispatch(conversationHistoryOpened({ accountEmail: account.email, snapshot })))
+    expect(hook.result.current.govProgram).toEqual(program)
+    expect(hook.result.current.messages.at(-1)?.govApplication).toEqual(application)
+    expect(hook.search).toHaveBeenCalledOnce()
+    expect(hook.gov).toHaveBeenCalledTimes(2)
   })
 
   it('members keep the existing conversation API', async () => {

@@ -6,7 +6,9 @@ FastAPI, OpenAI 임베딩, Qdrant로 전체 공고에서 관련 후보를 찾고
 ## 관리자 Gov 에이전트 경로 선택
 
 `POST /internal/v1/gov-agent/decide`는 `GovAgentSupervisor → 기존 LangChain 호출 → OpenAI → strict action 검증`으로
-`SEARCH`, `EVIDENCE`, `UNSUPPORTED` 중 하나를 반환합니다. 실제 검색 조건 해석·원문 RAG는 Core의 기존 Service가 실행합니다.
+`SEARCH`, `EVIDENCE`, `APPLICATION`, `UNSUPPORTED` 중 하나를 반환합니다. 실제 검색 조건 해석·원문 RAG는 Core의 기존 Service가 실행합니다.
+`APPLICATION`은 선택 공고의 신청 준비 화면을 대화 안에 연결하는 경로입니다. 양식 분석·준비 건 생성은 사용자의 버튼 실행 뒤 기존 API가 처리하며,
+supervisor가 직접 신청서·작업을 생성하지 않습니다. 제출 서류에 관한 원문 질문은 `EVIDENCE`, 기관 제출·삭제·일괄 실행은 `UNSUPPORTED`입니다.
 한 턴에 한 기능을 위임하는 초기 supervisor이며 A2A, 새 프레임워크, 자유로운 도구 호출 루프는 추가하지 않습니다.
 기존 `OPENAI_ASSISTANT_MODEL`을 사용하고 한 번의 모델 호출·출력 200토큰·최대 20초·재시도 없음·`store=false`를 적용합니다.
 선택 여부와 검색 문맥만 받고 사용자 계정·역할·공고 원문·도구 주소는 받지 않습니다.
