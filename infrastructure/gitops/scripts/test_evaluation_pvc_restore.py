@@ -631,6 +631,35 @@ class KubernetesTests(unittest.TestCase):
                 any("--force" in args or "patch" in args for args, _ in self.events)
             )
 
+    def test_namespace_cleanup_allows_runtime_shutdown_and_pvc_release(self):
+        # Runtime Pods may use their full shutdown grace before PVC protection
+        # and namespace controllers can finish. A helper-only timeout is shorter.
+        template = (
+            Path(__file__).resolve().parents[1]
+            / "charts/govbiz-evaluation/templates/workload.yaml"
+        ).read_text()
+        grace = int(
+            template.split("terminationGracePeriodSeconds:", 1)[1].split()[0]
+        )
+
+        def delayed_cleanup(args, **kwargs):
+            if "delete" in args and "namespace" in args:
+                seconds = int(
+                    next(a for a in args if a.startswith("--timeout="))
+                    .removeprefix("--timeout=")
+                    .removesuffix("s")
+                )
+                if seconds <= grace + 30:
+                    raise TimeoutError("runtime Pod is still terminating")
+                self.assertGreater(kwargs["timeout"], seconds)
+                self.assertLessEqual(seconds, 300)
+            return self.command(args, **kwargs)
+
+        with patch.object(
+            restore.snapshot.storage, "run", side_effect=delayed_cleanup
+        ):
+            self.assertTrue(self.rehearse()["cleanup_complete"])
+
     def retained(self):
         return restore.retain_for_migration(
             ["kubectl"], "fixture-control-plane", self.stores, self.expected
