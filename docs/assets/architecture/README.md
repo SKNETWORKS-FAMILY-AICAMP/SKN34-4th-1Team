@@ -43,11 +43,13 @@ application·observability EC2의 실제 Pod 배치와 Service를 통한 요청 
 초록은 업무 요청 전달, 파랑은 Core의 내부 호출, 보라는 Ops의 평가·결과 조회, 주황은 Nginx의 관리 화면 접속입니다.
 Ops Pod에는 API와 상태 동기화 컨테이너가 함께 있으며, Service 표시 위치는 실행 서버를 뜻하지 않습니다.
 
-발표자료를 갱신하면 저장소 루트에서 Poppler로 그림 영역을 다시 추출합니다. PDF 파일 자체는 변경하지 않습니다.
+발표자료 PDF는 저장소에서 관리하지 않습니다. 그림을 갱신할 때는 로컬에 보관한 해당 발표자료의
+경로를 아래 `/path/to/presentation.pdf` 대신 지정하고, 저장소 루트에서 Poppler로 그림 영역을
+다시 추출합니다. PDF 파일 자체는 변경하지 않습니다.
 
 ```sh
 pdftoppm -f 15 -l 15 -r 192 -x 88 -y 438 -W 2384 -H 926 -singlefile -png \
-  output/pdf/GovBiz_4차프로젝트_발표자료_19장_main_c09b97ac.pdf \
+  /path/to/presentation.pdf \
   docs/assets/architecture/govbiz-kubernetes-application
 ```
 
