@@ -35,6 +35,7 @@ backend/catalog-service/bin/
 *.class
 
 # Runtime and local artifacts
+/output/
 # Local publishing workspace; do not commit it as an embedded Git repository.
 /site-publish/
 .data/
